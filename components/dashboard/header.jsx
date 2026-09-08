@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { Search, Sun, Moon, ArrowLeft, LogOut } from "lucide-react";
+import { Search, Sun, Moon, ArrowLeft, LogOut, FileSpreadsheet } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -47,6 +47,8 @@ export function Header({
   theme,
   onToggleTheme,
   user,
+  onSyncSheet,
+  sheetSyncing,
 }) {
   const viewOnly = role !== "admin" && role !== "editor";
   return (
@@ -96,6 +98,18 @@ export function Header({
             <option>Needs Revision</option>
             <option>Discarded</option>
           </Select>
+          {role === "admin" ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onSyncSheet}
+              disabled={sheetSyncing}
+              aria-label="Sync a snapshot to the Google Sheet"
+              title="Sync a snapshot to the Google Sheet"
+            >
+              <FileSpreadsheet className={`size-4 ${sheetSyncing ? "animate-pulse" : ""}`} />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"

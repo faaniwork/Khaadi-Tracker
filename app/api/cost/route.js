@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { updateCost } from '@/lib/sheets';
+import { updateCost } from '@/lib/db';
 
 export async function POST(req) {
   const session = await auth();

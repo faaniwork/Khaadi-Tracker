@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { getBoardData } from '@/lib/sheets';
+import { getBoardData } from '@/lib/db';
 
 export async function GET() {
   const session = await auth();

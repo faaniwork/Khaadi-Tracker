@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RELEASE_ORDER, moodFor, mascotMessage, FUN_MESSAGES } from "@/lib/constants";
-import { fetchBoard, saveDressField, saveBulkStatus, saveCost, saveNote } from "@/lib/api";
+import { fetchBoard, saveDressField, saveBulkStatus, saveCost, saveNote, syncToSheet } from "@/lib/api";
 import { burstConfetti } from "@/lib/confetti-bus";
 import { ConfettiCanvas } from "@/components/confetti-canvas";
 import { Toast } from "@/components/toast";
@@ -57,6 +57,7 @@ export function Dashboard({ user }) {
   const [mascot, setMascot] = useState({ active: false, message: "" });
   const [theme, setTheme] = useState("light");
   const [bulkConfirm, setBulkConfirm] = useState(null); // { scope, key, status, count }
+  const [sheetSyncing, setSheetSyncing] = useState(false);
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -423,6 +424,20 @@ export function Dashboard({ user }) {
     });
   }, []);
 
+  const onSyncSheet = useCallback(async () => {
+    if (sheetSyncing) return;
+    setSheetSyncing(true);
+    try {
+      const res = await syncToSheet();
+      showToast(`Sheet updated — ${res.rows} rows`);
+    } catch (e) {
+      console.error("sheet sync failed", e);
+      showToast(e.message || "Sheet sync failed", "error");
+    } finally {
+      setSheetSyncing(false);
+    }
+  }, [sheetSyncing, showToast]);
+
   const onNav = useCallback((target) => {
     setView(target === "overview" ? { page: "overview", batch: null } : { page: "batch", batch: target });
     setSearch("");
@@ -491,6 +506,8 @@ export function Dashboard({ user }) {
           theme={theme}
           onToggleTheme={onToggleTheme}
           user={user}
+          onSyncSheet={onSyncSheet}
+          sheetSyncing={sheetSyncing}
         />
         <main className="flex-1 max-w-[1280px] w-full mx-auto px-5 sm:px-8 py-6 pb-16">
           {searching ? (
@@ -559,9 +576,9 @@ export function Dashboard({ user }) {
           )}
         </main>
         <footer className="max-w-[1280px] mx-auto px-5 sm:px-8 pb-10 text-xs text-muted-foreground">
-          Editors&rsquo; changes to status, comments and credit cost save straight to the Tracker sheet and are tagged
+          Editors&rsquo; changes to status, comments and credit cost save straight to the database and are tagged
           with whoever made them. Everyone else sees a live, view-only copy. Refreshes automatically every few
-          seconds — ask an admin to add you as an editor in the sheet&rsquo;s Access tab.
+          seconds — ask an admin to add you as an editor in the access table.
         </footer>
       </div>
 
