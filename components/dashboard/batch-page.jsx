@@ -1,8 +1,14 @@
-import { Folder, Check } from "lucide-react";
-import { RELEASE_LINKS, COLLECTION_LINKS } from "@/lib/constants";
+"use client";
+
+import { useState } from "react";
+import { Folder, Check, Ban, RefreshCw } from "lucide-react";
+import { RELEASE_LINKS, COLLECTION_LINKS, timeAgo } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
+import { Button } from "@/components/ui/button";
 import { BulkStatusControl } from "./status-select";
 import { CostInput, CollectionCard, NotesCard } from "./dress-table";
+import { DressFiles } from "./files";
+import { ReviewLinksCard } from "./review-links";
 
 export function BatchPage({
   rel,
@@ -22,7 +28,13 @@ export function BatchPage({
   onBulkStatus,
   onAddNote,
   onRenameCollection,
+  role,
+  driveSync,
+  onResync,
+  resyncing,
+  showToast,
 }) {
+  const [openFiles, setOpenFiles] = useState(null);
   if (!rows.length) {
     return (
       <>
@@ -34,20 +46,35 @@ export function BatchPage({
     );
   }
   const delivered = rows.filter((r) => r.status === "Delivered").length;
+  const discarded = rows.filter((r) => r.status === "Discarded").length;
   const pct = rows.length ? (delivered / rows.length) * 100 : 0;
   const complete = rows.length > 0 && delivered === rows.length;
+  const allDiscarded = rows.length > 0 && discarded === rows.length;
   const relLink = RELEASE_LINKS[rel];
   const colKeys = Object.keys(collections);
 
   return (
     <>
-      <div className="rounded-[20px] border border-border bg-card p-5 mb-5 rise">
+      <div
+        className="rounded-[20px] border border-border bg-card p-5 mb-5 rise"
+        style={allDiscarded ? { borderColor: "var(--destructive)" } : undefined}
+      >
         <div className="flex items-start gap-4 flex-wrap">
           <Ring
-            pct={pct}
+            pct={allDiscarded ? 100 : pct}
             size={60}
-            color={complete ? "var(--good)" : undefined}
-            label={complete ? <Check className="size-5" style={{ color: "var(--good)" }} /> : undefined}
+            color={allDiscarded ? "var(--destructive)" : complete ? "var(--good)" : undefined}
+            label={
+              allDiscarded ? (
+                <Ban className="size-5" style={{ color: "var(--destructive)" }} />
+              ) : complete ? (
+                <Check className="size-5" style={{ color: "var(--good)" }} />
+              ) : Math.round(pct) ? (
+                undefined
+              ) : (
+                ""
+              )
+            }
           />
           <div className="flex-1 min-w-[180px]">
             <p className="text-xs text-muted-foreground">
@@ -97,9 +124,43 @@ export function BatchPage({
                 <Folder className="size-3.5" /> Folder
               </a>
             ) : null}
+            {canEdit ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onResync?.(rel)}
+                disabled={resyncing}
+                title="Read this batch's Drive folder and update names, counts and which folders still count as dresses"
+              >
+                <RefreshCw className={`size-3.5 ${resyncing ? "animate-spin" : ""}`} />
+                {resyncing ? "Checking Drive…" : "Resync from Drive"}
+              </Button>
+            ) : null}
           </div>
+          {driveSync?.at ? (
+            <p className="text-[10.5px] text-muted-foreground basis-full">
+              Drive checked {timeAgo(driveSync.at)}
+              {driveSync.by ? ` by ${driveSync.by}` : ""}
+              {driveSync.summary ? ` — ${driveSync.summary}` : ""}
+            </p>
+          ) : (
+            <p className="text-[10.5px] text-muted-foreground basis-full">
+              Never checked against Drive, so names and file counts here may be out of date.
+            </p>
+          )}
         </div>
       </div>
+
+      {openFiles ? (
+        <DressFiles
+          dress={openFiles}
+          canWrite={canEdit}
+          showToast={showToast}
+          onClose={() => setOpenFiles(null)}
+        />
+      ) : null}
+
+      {role === "admin" ? <ReviewLinksCard release={rel} showToast={showToast} /> : null}
 
       <NotesCard rel={rel} list={notesForBatch} canEdit={canEdit} onAddNote={onAddNote} />
 
@@ -123,6 +184,7 @@ export function BatchPage({
             onCostRetry={onCostRetry}
             onBulkStatus={onBulkStatus}
             onRenameCollection={onRenameCollection}
+            onOpenFiles={setOpenFiles}
           />
         );
       })}

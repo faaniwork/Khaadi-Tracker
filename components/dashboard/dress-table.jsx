@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Coins, ExternalLink, Pencil, Check, X } from "lucide-react";
+import { Coins, ExternalLink, Pencil, Check, X, Images } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,20 +12,24 @@ export function CostInput({ scope, keyName, value, syncState, disabled, onChange
     <label className="flex items-center gap-1.5 f-mono text-xs px-2 py-1.5 rounded-lg border-[1.5px] border-border bg-secondary/60 text-muted-foreground">
       <SyncDot state={syncState} onRetry={onRetry} title="Saved" />
       <Coins className="size-3.5" />
+      {/* Shows blank rather than a literal 0 when no credits have been
+          recorded, so an untouched pill reads as empty instead of as a
+          number someone entered. */}
       <input
         type="number"
         min="0"
         step="1"
-        value={value || 0}
+        value={value ? String(value) : ""}
+        placeholder="0"
         disabled={disabled}
         onChange={(e) => onChange(scope, keyName, e.target.value)}
-        className="bg-transparent border-0 outline-none w-14 font-semibold text-foreground disabled:opacity-60"
+        className="bg-transparent border-0 outline-none w-14 font-semibold text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal disabled:opacity-60"
       />
     </label>
   );
 }
 
-export function DressRow({ row, disabled, syncState, onFieldChange, onRetry }) {
+export function DressRow({ row, disabled, syncState, onFieldChange, onRetry, onOpenFiles }) {
   const discarded = row.status === "Discarded";
   return (
     <tr className="dress-row border-b border-border last:border-0">
@@ -40,8 +44,18 @@ export function DressRow({ row, disabled, syncState, onFieldChange, onRetry }) {
           onChange={(v) => onFieldChange(row.id, "status", v)}
         />
       </td>
-      <td className="py-3 px-4 f-mono text-xs text-muted-foreground whitespace-nowrap">
-        {row.files != null ? row.files : "—"} files
+      {/* The file count doubles as the way into the dress's Drive folder,
+          since "how many files" and "which files" are the same question. */}
+      <td className="py-3 px-4 whitespace-nowrap">
+        <button
+          type="button"
+          onClick={() => onOpenFiles?.(row)}
+          title="Browse this dress's Drive folder"
+          className="f-mono text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5 rounded-lg px-1.5 py-1 -mx-1.5 hover:bg-secondary transition-colors"
+        >
+          <Images className="size-3.5" />
+          {row.files != null ? row.files : "—"} files
+        </button>
       </td>
       <td className="py-3 px-4">
         <input
@@ -97,6 +111,7 @@ export function CollectionCard({
   onCostRetry,
   onBulkStatus,
   onRenameCollection,
+  onOpenFiles,
 }) {
   const delivered = colRows.filter((r) => r.status === "Delivered").length;
   const [renaming, setRenaming] = useState(false);
@@ -238,6 +253,7 @@ export function CollectionCard({
                   syncState={sync[`row:${r.id}`] || "idle"}
                   onFieldChange={onFieldChange}
                   onRetry={() => onRetry(r.id)}
+                  onOpenFiles={onOpenFiles}
                 />
               ))}
             </tbody>

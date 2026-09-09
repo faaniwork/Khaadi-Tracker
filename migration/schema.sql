@@ -11,8 +11,27 @@ CREATE TABLE IF NOT EXISTS dresses (
   comments TEXT NOT NULL DEFAULT '',
   credits INTEGER NOT NULL DEFAULT 0,
   revisions INTEGER NOT NULL DEFAULT 1,   -- 1-9, see migration/002_add_revisions.sql
+  archived INTEGER NOT NULL DEFAULT 0,    -- 1 = folder is no longer a dress; hidden but kept
   updated_by TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL DEFAULT 0
+);
+
+-- Shared profile pictures, readable by everyone who can sign in. The avatar
+-- is a client-resized data: URL a few kilobytes long, not a file reference.
+-- See migration/005_profiles.sql for why.
+CREATE TABLE IF NOT EXISTS profiles (
+  email TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL DEFAULT '',
+  avatar TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL DEFAULT 0
+);
+
+-- When each batch was last reconciled against Drive.
+CREATE TABLE IF NOT EXISTS release_sync (
+  release TEXT PRIMARY KEY,
+  synced_at INTEGER NOT NULL,
+  synced_by TEXT NOT NULL DEFAULT '',
+  summary TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS costs (
@@ -46,6 +65,36 @@ CREATE TABLE IF NOT EXISTS log (
   new_value TEXT
 );
 
+-- Review state for Drive files. Drive itself stays the source of truth for
+-- which files exist; this stores only the decision, keyed by Drive file id.
+-- A file with no row here is pending. See migration/003_drive_review.sql for
+-- why this is not a full mirror of Drive.
+CREATE TABLE IF NOT EXISTS file_reviews (
+  file_id TEXT PRIMARY KEY,                       -- Drive file id
+  dress_id TEXT NOT NULL,                         -- dresses.id, itself a Drive folder id
+  release TEXT NOT NULL DEFAULT '',
+  file_name TEXT NOT NULL DEFAULT '',
+  review_status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | rejected
+  feedback_reason TEXT,                           -- accuracy | pose | other | NULL
+  feedback_text TEXT,
+  reviewed_by TEXT NOT NULL DEFAULT '',
+  reviewed_at INTEGER NOT NULL DEFAULT 0
+);
+
+-- One shareable client review link per batch. The token is the credential.
+CREATE TABLE IF NOT EXISTS review_links (
+  token TEXT PRIMARY KEY,
+  release TEXT NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL,
+  revoked_at INTEGER NOT NULL DEFAULT 0           -- 0 = live
+);
+
 CREATE INDEX IF NOT EXISTS idx_dresses_release ON dresses(release);
 CREATE INDEX IF NOT EXISTS idx_dresses_collection ON dresses(collection);
+CREATE INDEX IF NOT EXISTS idx_dresses_archived ON dresses(archived);
 CREATE INDEX IF NOT EXISTS idx_log_scope ON log(scope);
+CREATE INDEX IF NOT EXISTS idx_file_reviews_dress ON file_reviews(dress_id);
+CREATE INDEX IF NOT EXISTS idx_file_reviews_release ON file_reviews(release);
+CREATE INDEX IF NOT EXISTS idx_review_links_release ON review_links(release);

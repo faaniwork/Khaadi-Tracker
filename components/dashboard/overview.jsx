@@ -1,4 +1,4 @@
-import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, Folder, ChevronRight, Check } from "lucide-react";
+import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, Folder, ChevronRight, Check, Ban } from "lucide-react";
 import { fmt, shortRelease, MILESTONE_TARGET, RELEASE_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 import { MascotRider } from "@/components/mascot";
@@ -127,29 +127,40 @@ export function OverviewChart({ releases, rowsFor }) {
 
 export function BatchCard({ rel, rr, colCount, noteCount, cost, canEdit, sync, onNav, onBulkStatus, onCostChange, onCostRetry }) {
   const delivered = rr.filter((r) => r.status === "Delivered").length;
+  const discarded = rr.filter((r) => r.status === "Discarded").length;
   const pct = rr.length ? (delivered / rr.length) * 100 : 0;
   const relLink = RELEASE_LINKS[rel];
   const complete = rr.length > 0 && delivered === rr.length;
+  const allDiscarded = rr.length > 0 && discarded === rr.length;
+
+  // A fully delivered batch shows a checkmark in the ring, which already says
+  // "complete" without a separate badge repeating it in the corner.
+  const ringColor = allDiscarded ? "var(--destructive)" : complete ? "var(--good)" : undefined;
+  const ringLabel = allDiscarded ? (
+    <Ban className="size-5" style={{ color: "var(--destructive)" }} />
+  ) : complete ? (
+    <Check className="size-5" style={{ color: "var(--good)" }} />
+  ) : Math.round(pct) ? (
+    undefined
+  ) : (
+    ""
+  );
 
   return (
-    <div className="rounded-[20px] border border-border bg-card p-5 rise relative overflow-hidden card-hover transition-shadow">
-      {complete ? (
-        <span
-          className="absolute top-4 right-4 f-mono text-[10px] font-bold px-2.5 py-1 rounded-full"
-          style={{ background: "var(--good)", color: "var(--good-foreground)" }}
-        >
-          🎉 Complete
-        </span>
-      ) : null}
+    <div
+      className="rounded-[20px] border border-border bg-card p-5 rise relative overflow-hidden card-hover transition-shadow"
+      style={allDiscarded ? { borderColor: "var(--destructive)" } : undefined}
+    >
       <div className="flex items-start gap-4 mb-4">
-        <Ring
-          pct={pct}
-          size={60}
-          color={complete ? "var(--good)" : undefined}
-          label={complete ? <Check className="size-5" style={{ color: "var(--good)" }} /> : undefined}
-        />
+        <Ring pct={allDiscarded ? 100 : pct} size={60} color={ringColor} label={ringLabel} />
         <div className="min-w-0">
-          <h3 className="f-heading font-bold text-lg leading-tight truncate text-foreground">{rel}</h3>
+          <h3
+            className={`f-heading font-bold text-lg leading-tight truncate text-foreground ${
+              allDiscarded ? "line-through opacity-70" : ""
+            }`}
+          >
+            {rel}
+          </h3>
           <p className="text-xs mt-0.5 text-muted-foreground">
             {colCount} collection{colCount === 1 ? "" : "s"} · {rr.length} dress{rr.length === 1 ? "" : "es"} · {delivered} delivered
             {noteCount ? ` · ${noteCount} note${noteCount === 1 ? "" : "s"}` : ""}

@@ -11,17 +11,19 @@ import {
   saveNote,
   syncToSheet,
   renameCollection as renameCollectionApi,
+  driveResync,
+  fetchProfiles,
 } from "@/lib/api";
 import { burstConfetti } from "@/lib/confetti-bus";
 import { ConfettiCanvas } from "@/components/confetti-canvas";
 import { Toast } from "@/components/toast";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Sidebar, MobileNav } from "@/components/dashboard/nav";
 import { Header } from "@/components/dashboard/header";
 import { OverviewStats, OverviewChart, BatchCard } from "@/components/dashboard/overview";
 import { BatchPage } from "@/components/dashboard/batch-page";
 import { SearchResults } from "@/components/dashboard/search-results";
 import { ActivityPage } from "@/components/dashboard/activity";
+import { ProfileDialog } from "@/components/dashboard/profile-dialog";
 import { AccessPage } from "@/components/dashboard/access";
 
 const POLL_MS = 15000;
@@ -41,6 +43,25 @@ function collectionsFor(rows, rel) {
     (map[c] = map[c] || []).push(r);
   });
   return map;
+}
+/**
+ * One batch's headline numbers. `allDiscarded` is what lets the UI tell a
+ * dead batch apart from one that simply has not started: both sit at 0%
+ * delivered, which is why they used to look identical.
+ */
+function batchStats(rows, rel) {
+  const rr = rowsFor(rows, rel);
+  const delivered = rr.filter((r) => r.status === "Delivered").length;
+  const discarded = rr.filter((r) => r.status === "Discarded").length;
+  return {
+    rows: rr,
+    total: rr.length,
+    delivered,
+    discarded,
+    pct: rr.length ? (delivered / rr.length) * 100 : 0,
+    complete: rr.length > 0 && delivered === rr.length,
+    allDiscarded: rr.length > 0 && discarded === rr.length,
+  };
 }
 function costForRelease(costs, rel) {
   return Number(costs.batches?.[rel]) || 0;
@@ -68,9 +89,12 @@ export function Dashboard({ user }) {
   const [toast, setToast] = useState({ message: "", kind: "ok", visible: false });
   const [mascot, setMascot] = useState({ active: false, message: "" });
   const [theme, setTheme] = useState("light");
-  const [bulkConfirm, setBulkConfirm] = useState(null); // { scope, key, status, count }
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [visibleBatches, setVisibleBatches] = useState(BATCHES_PER_PAGE);
+  const [driveSync, setDriveSync] = useState({});
+  const [resyncing, setResyncing] = useState("");
+  const [profiles, setProfiles] = useState({ byEmail: {}, byName: {} });
+  const [editingProfile, setEditingProfile] = useState(false);
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -151,6 +175,7 @@ export function Dashboard({ user }) {
         });
         setNotes(data.notes || { batches: {} });
         setRole(data.role || "viewer");
+        setDriveSync(data.driveSync || {});
         setLive(true);
         detectCelebrations(serverRows);
       } catch (e) {
@@ -163,6 +188,21 @@ export function Dashboard({ user }) {
     },
     [detectCelebrations, showToast]
   );
+
+  // Fetched once rather than on the board poll: avatars are a few kilobytes
+  // each and almost never change, so re-sending them every 15 seconds would
+  // be waste. State is set only inside then/catch, never in the effect body.
+  useEffect(() => {
+    let ignore = false;
+    fetchProfiles()
+      .then((data) => {
+        if (!ignore) setProfiles({ byEmail: data.byEmail || {}, byName: data.byName || {} });
+      })
+      .catch((e) => console.error("profiles load failed", e));
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   useEffect(() => {
     loadData(false);
@@ -360,14 +400,9 @@ export function Dashboard({ user }) {
     [costs, setDot, showToast]
   );
 
-  const requestBulkStatus = useCallback((scope, key, status, count) => {
-    setBulkConfirm({ scope, key, status, count });
-  }, []);
-
-  const confirmBulkStatus = useCallback(async () => {
-    if (!bulkConfirm) return;
-    const { scope, key, status } = bulkConfirm;
-    setBulkConfirm(null);
+  // Applied straight away. There is no confirmation step: it is one status
+  // field on rows that are all visible, and setting it again fixes a mistake.
+  const requestBulkStatus = useCallback(async (scope, key, status) => {
     let targets;
     if (scope === "collection") {
       const [rel, col] = key.split("␟");
@@ -392,7 +427,7 @@ export function Dashboard({ user }) {
       console.error("bulk save failed", e);
       showToast("Bulk save failed — try again", "error");
     }
-  }, [bulkConfirm, rows, user, showToast]);
+  }, [rows, user, showToast]);
 
   const onAddNote = useCallback(
     async (release, text) => {
@@ -473,6 +508,37 @@ export function Dashboard({ user }) {
     }
   }, [sheetSyncing, showToast]);
 
+  /**
+   * Reconciles one batch against Drive, then reloads the board.
+   *
+   * Manual rather than automatic: a batch means dozens of Drive calls, so
+   * running it on the 15-second poll would be slow and wasteful. This is the
+   * button to press after reorganising folders in Drive.
+   */
+  const onResync = useCallback(
+    async (release) => {
+      if (resyncing) return;
+      setResyncing(release);
+      try {
+        const res = await driveResync({ release });
+        setDriveSync((prev) => ({
+          ...prev,
+          [release]: { at: res.syncedAt, by: "you", summary: res.text },
+        }));
+        const skipped = res.skipped?.length
+          ? ` Skipped ${res.skipped.length} folder${res.skipped.length === 1 ? "" : "s"} that don't look like dresses.`
+          : "";
+        showToast(`Drive check done — ${res.text}.${skipped}`, "ok");
+        await loadData(true);
+      } catch (e) {
+        showToast(e.message || "Could not read Drive", "error");
+      } finally {
+        setResyncing("");
+      }
+    },
+    [resyncing, showToast, loadData]
+  );
+
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
     else if (target === "activity" || target === "access") setView({ page: target, batch: null });
@@ -488,9 +554,8 @@ export function Dashboard({ user }) {
     const items = [
       { id: "overview", label: "All" },
       ...releases.map((r) => {
-        const rr = rowsFor(rows, r);
-        const pct = rr.length ? (rr.filter((x) => x.status === "Delivered").length / rr.length) * 100 : 0;
-        return { id: r, label: r, pct };
+        const s = batchStats(rows, r);
+        return { id: r, label: r, pct: s.pct, discarded: s.allDiscarded };
       }),
       { id: "activity", label: "Activity", icon: Activity },
     ];
@@ -547,6 +612,8 @@ export function Dashboard({ user }) {
           user={user}
           onSyncSheet={onSyncSheet}
           sheetSyncing={sheetSyncing}
+          myAvatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
+          onEditProfile={() => setEditingProfile(true)}
         />
         <main className="flex-1 max-w-[1280px] w-full mx-auto px-5 sm:px-8 py-6 pb-16">
           {searching ? (
@@ -607,7 +674,7 @@ export function Dashboard({ user }) {
               )}
             </>
           ) : view.page === "activity" ? (
-            <ActivityPage />
+            <ActivityPage profiles={profiles} />
           ) : view.page === "access" ? (
             <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
           ) : (
@@ -629,6 +696,11 @@ export function Dashboard({ user }) {
               onBulkStatus={requestBulkStatus}
               onAddNote={onAddNote}
               onRenameCollection={onRenameCollection}
+              role={role}
+              driveSync={driveSync[view.batch]}
+              onResync={onResync}
+              resyncing={resyncing === view.batch}
+              showToast={showToast}
             />
           )}
         </main>
@@ -640,19 +712,19 @@ export function Dashboard({ user }) {
       </div>
 
       <Toast message={toast.message} kind={toast.kind} visible={toast.visible} />
-      <ConfettiCanvas />
-      <ConfirmDialog
-        open={!!bulkConfirm}
-        title="Bulk status change"
-        description={
-          bulkConfirm
-            ? `Set status to "${bulkConfirm.status}" for all ${bulkConfirm.count} dresses here? This applies to every row at once and can't be undone automatically.`
-            : ""
+      <ProfileDialog
+        open={editingProfile}
+        user={user}
+        avatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
+        onSaved={(profile) =>
+          setProfiles((prev) => ({
+            byEmail: { ...prev.byEmail, [profile.email]: profile },
+            byName: profile.name ? { ...prev.byName, [profile.name]: profile } : prev.byName,
+          }))
         }
-        confirmLabel="Set for all"
-        onConfirm={confirmBulkStatus}
-        onCancel={() => setBulkConfirm(null)}
+        onClose={() => setEditingProfile(false)}
       />
+      <ConfettiCanvas />
     </div>
   );
 }

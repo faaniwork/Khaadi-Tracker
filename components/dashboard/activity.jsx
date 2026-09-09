@@ -1,37 +1,166 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Activity as ActivityIcon, RefreshCw } from "lucide-react";
-import { timeAgo } from "@/lib/constants";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Activity as ActivityIcon,
+  RefreshCw,
+  Coins,
+  MessageSquare,
+  Tag,
+  ShieldCheck,
+  Image as ImageIcon,
+  FolderSync,
+  Trash2,
+  UserRound,
+  Link2,
+  Repeat2,
+} from "lucide-react";
+import { timeAgo, fmt } from "@/lib/constants";
 import { fetchActivity } from "@/lib/api";
+import { Avatar } from "@/components/ui/avatar";
 
-const FIELD_LABEL = {
-  status: "changed status",
-  comments: "edited comments",
-  credits: "changed credit cost",
-  revisions: "changed revisions",
-  cost: "updated cost",
-  note: "added a note",
-  rename: "renamed a collection",
-  role: "changed access",
+/**
+ * Every kind of log entry, with the colour and icon that carries it.
+ *
+ * The list used to be one undifferentiated grey column, which made a wall of
+ * cost edits impossible to skim past to find the thing you actually wanted.
+ * Colour comes from the KIND of change, so the eye can filter before reading.
+ */
+const KINDS = {
+  status: { label: "status", icon: Tag, color: "var(--info)" },
+  comments: { label: "comment", icon: MessageSquare, color: "var(--muted-foreground)" },
+  credits: { label: "credits", icon: Coins, color: "var(--warn)" },
+  revisions: { label: "revisions", icon: Repeat2, color: "var(--warn)" },
+  cost: { label: "cost", icon: Coins, color: "var(--warn)" },
+  note: { label: "note", icon: MessageSquare, color: "var(--info)" },
+  rename: { label: "rename", icon: Tag, color: "var(--primary)" },
+  role: { label: "access", icon: ShieldCheck, color: "var(--destructive)" },
+  picture: { label: "picture", icon: UserRound, color: "var(--primary)" },
+  review: { label: "review", icon: ImageIcon, color: "var(--good)" },
+  file: { label: "file", icon: ImageIcon, color: "var(--good)" },
+  trash: { label: "file removed", icon: Trash2, color: "var(--destructive)" },
+  drive: { label: "Drive", icon: FolderSync, color: "var(--primary)" },
+  link: { label: "review link", icon: Link2, color: "var(--primary)" },
+  default: { label: "change", icon: ActivityIcon, color: "var(--muted-foreground)" },
 };
 
-function describe(entry) {
-  const verb = FIELD_LABEL[entry.field] || `changed ${entry.field}`;
-  let scopeLabel = entry.scope;
-  if (entry.scope.startsWith("row:")) scopeLabel = "a dress";
-  else if (entry.scope.startsWith("bulk:")) scopeLabel = entry.scope.replace("bulk:", "") + " (bulk)";
-  else if (entry.scope.startsWith("cost:")) scopeLabel = entry.scope.split(":").slice(1).join(" · ");
-  else if (entry.scope.startsWith("note:")) scopeLabel = entry.scope.replace("note:", "");
-  else if (entry.scope.startsWith("collection:")) scopeLabel = entry.scope.replace("collection:", "");
-  else if (entry.scope.startsWith("access:")) scopeLabel = entry.scope.replace("access:", "");
-  return { verb, scopeLabel };
+const STATUS_COLOR = {
+  Delivered: "var(--good)",
+  "In Progress": "var(--info)",
+  "Needs Revision": "var(--warn)",
+  Discarded: "var(--destructive)",
+  "Not Started": "var(--muted-foreground)",
+};
+
+const VERBS = {
+  status: "set status",
+  comments: "edited the comment",
+  credits: "changed credits",
+  revisions: "changed revisions",
+  cost: "changed cost",
+  note: "added a note",
+  rename: "renamed",
+  role: "changed access",
+  picture: "updated their picture",
+};
+
+/**
+ * Numbers arrive from D1 as "32032423.0", which is unreadable at a glance and
+ * was the single worst thing about this list. Credits are whole numbers, so
+ * the decimal is dropped and thousands are separated.
+ */
+function prettyValue(raw) {
+  const s = String(raw ?? "");
+  if (!s) return "";
+  if (/^-?\d+(\.0+)?$/.test(s)) return fmt(Math.round(Number(s)));
+  if (/^-?\d+\.\d+$/.test(s)) {
+    const n = Number(s);
+    return Number.isInteger(n) ? fmt(n) : fmt(Math.round(n));
+  }
+  return s;
 }
 
-export function ActivityPage() {
+function classify(entry) {
+  const scope = entry.scope || "";
+  const field = entry.field || "";
+
+  if (scope.startsWith("review-link:")) return KINDS.link;
+  if (scope.startsWith("profile:")) return KINDS.picture;
+  if (scope.startsWith("access:")) return KINDS.role;
+  if (scope.startsWith("file:")) {
+    if (/trash/i.test(String(entry.newValue))) return KINDS.trash;
+    return KINDS.review;
+  }
+  if (/drive/i.test(field) || field === "added from Drive" || field === "back on the board") {
+    return KINDS.drive;
+  }
+  return KINDS[field] || KINDS.default;
+}
+
+/** The human-readable target of the change. */
+function targetOf(entry) {
+  const scope = entry.scope || "";
+  if (scope.startsWith("row:")) return "a dress";
+  if (scope.startsWith("file:")) return entry.field || "an image";
+  if (scope.startsWith("bulk:")) return scope.replace("bulk:", "");
+  if (scope.startsWith("cost:")) return scope.split(":").slice(1).join(" · ");
+  if (scope.startsWith("note:")) return scope.replace("note:", "");
+  if (scope.startsWith("collection:")) return scope.replace("collection:", "");
+  if (scope.startsWith("access:")) return scope.replace("access:", "");
+  if (scope.startsWith("review-link:")) return scope.replace("review-link:", "");
+  if (scope.startsWith("profile:")) return "";
+  return scope;
+}
+
+function verbFor(entry, kind) {
+  const scope = entry.scope || "";
+  if (scope.startsWith("file:")) {
+    const v = String(entry.newValue || "");
+    if (/trash/i.test(v)) return "removed";
+    if (v.startsWith("approved")) return "approved";
+    if (v.startsWith("rejected")) return "rejected";
+    return "reviewed";
+  }
+  if (scope.startsWith("review-link:")) return `${entry.field} a review link for`;
+  if (scope.startsWith("bulk:")) return "set status in bulk on";
+  if (kind === KINDS.drive) return entry.field;
+  return VERBS[entry.field] || `changed ${entry.field}`;
+}
+
+function dayLabel(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yday = new Date(today);
+  yday.setDate(today.getDate() - 1);
+  const same = (a, b) => a.toDateString() === b.toDateString();
+  if (same(d, today)) return "Today";
+  if (same(d, yday)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+}
+
+function ValueChange({ entry }) {
+  const from = prettyValue(entry.oldValue);
+  const to = prettyValue(entry.newValue);
+  if (!from && !to) return null;
+  const toColor = STATUS_COLOR[entry.newValue];
+  return (
+    <p className="text-sm mt-0.5 break-words">
+      {from ? <span className="line-through text-muted-foreground/70">{from}</span> : null}
+      {from && to ? <span className="text-muted-foreground"> → </span> : null}
+      {to ? (
+        <span className="font-bold" style={toColor ? { color: toColor } : { color: "var(--foreground)" }}>
+          {to}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
+export function ActivityPage({ profiles }) {
   const [entries, setEntries] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [kindFilter, setKindFilter] = useState("");
 
   // Runs once on mount. State is only ever set inside the promise's
   // then/catch (never synchronously in the effect body), so there is no
@@ -66,61 +195,120 @@ export function ActivityPage() {
   };
   const loading = entries === null && !error;
 
+  // Grouped by day, so a long list reads as a timeline rather than 300
+  // interchangeable rows.
+  const grouped = useMemo(() => {
+    if (!entries) return [];
+    const filtered = kindFilter
+      ? entries.filter((e) => classify(e).label === kindFilter)
+      : entries;
+    const out = [];
+    let currentDay = null;
+    filtered.forEach((e) => {
+      const day = dayLabel(e.at);
+      if (day !== currentDay) {
+        out.push({ day, items: [] });
+        currentDay = day;
+      }
+      out[out.length - 1].items.push(e);
+    });
+    return out;
+  }, [entries, kindFilter]);
+
+  const availableKinds = useMemo(() => {
+    if (!entries) return [];
+    return [...new Set(entries.map((e) => classify(e).label))].sort();
+  }, [entries]);
+
+  const lookup = (name) => profiles?.byName?.[name];
+
   return (
     <div className="rounded-[20px] border border-border bg-card p-5 rise">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <ActivityIcon className="size-4 text-primary" />
-          <h2 className="f-heading font-bold text-sm text-foreground">Activity</h2>
-          <span className="text-xs text-muted-foreground">who changed what, most recent first</span>
+      <div className="flex items-center gap-2 flex-wrap mb-4">
+        <ActivityIcon className="size-4 text-primary" />
+        <h2 className="f-heading font-bold text-sm text-foreground">Activity</h2>
+        <span className="text-xs text-muted-foreground">newest first</span>
+        <div className="ml-auto flex items-center gap-2">
+          {availableKinds.length > 1 ? (
+            <select
+              value={kindFilter}
+              onChange={(e) => setKindFilter(e.target.value)}
+              className="rounded-[10px] border border-border bg-secondary/60 px-2 py-1.5 text-xs font-semibold text-foreground cursor-pointer outline-none focus-visible:border-primary"
+            >
+              <option value="">Everything</option>
+              {availableKinds.map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={loading || refreshing}
+            className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
+            aria-label="Refresh activity"
+            title="Refresh"
+          >
+            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={loading || refreshing}
-          className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
-          aria-label="Refresh activity"
-          title="Refresh"
-        >
-          <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
-        </button>
       </div>
 
       {error ? (
-        <p className="text-sm text-destructive">{error}</p>
+        <p className="text-sm" style={{ color: "var(--destructive)" }}>
+          {error}
+        </p>
       ) : entries === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : !entries.length ? (
-        <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+      ) : !grouped.length ? (
+        <p className="text-sm text-muted-foreground">
+          {kindFilter ? `No ${kindFilter} changes recorded.` : "No activity recorded yet."}
+        </p>
       ) : (
-        <div className="flex flex-col">
-          {entries.map((e) => {
-            const { verb, scopeLabel } = describe(e);
-            return (
-              <div key={e.id} className="flex gap-3 py-2.5 border-b border-border last:border-0">
-                <div className="size-7 rounded-full flex items-center justify-center f-mono text-[10px] font-bold shrink-0 bg-primary/15 text-primary">
-                  {(e.by || "?").slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-foreground">{e.by}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {verb} on <span className="font-semibold text-foreground">{scopeLabel}</span>
+        grouped.map((group) => (
+          <div key={group.day} className="mb-4 last:mb-0">
+            <p className="f-mono text-[10px] font-bold uppercase tracking-wide text-muted-foreground sticky top-0 bg-card py-1.5 z-[1]">
+              {group.day}
+            </p>
+            {group.items.map((e) => {
+              const kind = classify(e);
+              const Icon = kind.icon;
+              const target = targetOf(e);
+              const profile = lookup(e.by);
+              return (
+                <div key={e.id} className="flex gap-3 py-2.5 border-b border-border last:border-0">
+                  <div className="relative shrink-0">
+                    <Avatar name={e.by} avatar={profile?.avatar} size={30} />
+                    <span
+                      className="absolute -bottom-1 -right-1 size-4 rounded-full grid place-items-center border-2 border-card"
+                      style={{ background: kind.color }}
+                      title={kind.label}
+                    >
+                      <Icon className="size-2" style={{ color: "var(--card)" }} />
                     </span>
-                    <span className="text-[10.5px] ml-auto text-muted-foreground">{timeAgo(e.at)}</span>
                   </div>
-                  {e.oldValue || e.newValue ? (
-                    <p className="text-sm mt-0.5 break-words text-muted-foreground">
-                      {e.oldValue ? <span className="line-through opacity-70">{String(e.oldValue)}</span> : null}
-                      {e.oldValue && e.newValue ? " → " : ""}
-                      {e.newValue ? <span className="text-foreground">{String(e.newValue)}</span> : null}
-                    </p>
-                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-x-1.5 gap-y-0.5 flex-wrap">
+                      <span className="text-xs font-bold text-foreground">{e.by}</span>
+                      <span className="text-xs text-muted-foreground">{verbFor(e, kind)}</span>
+                      {target ? (
+                        <span className="text-xs font-bold" style={{ color: kind.color }}>
+                          {target}
+                        </span>
+                      ) : null}
+                      <span className="text-[10.5px] ml-auto text-muted-foreground whitespace-nowrap">
+                        {timeAgo(e.at)}
+                      </span>
+                    </div>
+                    <ValueChange entry={e} />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ))
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import { signOut } from "next-auth/react";
 import { Search, Sun, Moon, ArrowLeft, LogOut, FileSpreadsheet } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
 
 const PAGE_TITLES = {
   activity: ["Activity", "Who changed what, tracked in real time"],
@@ -70,6 +71,8 @@ export function Header({
   user,
   onSyncSheet,
   sheetSyncing,
+  myAvatar,
+  onEditProfile,
 }) {
   const viewOnly = role !== "admin" && role !== "editor";
   return (
@@ -140,7 +143,16 @@ export function Header({
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
-          <div className="f-mono text-xs flex items-center gap-2 px-2.5 py-2 rounded-xl border-[1.5px] border-border bg-secondary/60">
+          <div className="f-mono text-xs flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-xl border-[1.5px] border-border bg-secondary/60">
+            <button
+              type="button"
+              onClick={onEditProfile}
+              title="Change your picture"
+              aria-label="Change your picture"
+              className="rounded-full transition-transform hover:scale-105"
+            >
+              <Avatar name={user?.name || user?.email} avatar={myAvatar} size={26} />
+            </button>
             <span className="font-semibold text-foreground max-w-[110px] truncate" title={user?.email}>
               {user?.name || user?.email}
             </span>
