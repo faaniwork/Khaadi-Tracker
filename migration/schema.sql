@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS file_reviews (
   dress_id TEXT NOT NULL,                         -- dresses.id, itself a Drive folder id
   release TEXT NOT NULL DEFAULT '',
   file_name TEXT NOT NULL DEFAULT '',
-  review_status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | rejected
+  review_status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | feedback | rejected
   feedback_reason TEXT,                           -- accuracy | pose | other | NULL
   feedback_text TEXT,
   reviewed_by TEXT NOT NULL DEFAULT '',
@@ -82,6 +82,9 @@ CREATE TABLE IF NOT EXISTS file_reviews (
 );
 
 -- One shareable client review link per batch. The token is the credential.
+-- Retired (see migration/006_file_comments.sql's sibling removal in the app
+-- code) but left declared here so an old database's rows are not orphaned
+-- and a fresh install's schema still matches.
 CREATE TABLE IF NOT EXISTS review_links (
   token TEXT PRIMARY KEY,
   release TEXT NOT NULL,
@@ -91,6 +94,19 @@ CREATE TABLE IF NOT EXISTS review_links (
   revoked_at INTEGER NOT NULL DEFAULT 0           -- 0 = live
 );
 
+-- The comment thread on a file, independent of its current review decision.
+-- See migration/006_file_comments.sql for why this is a separate table
+-- rather than another column on file_reviews.
+CREATE TABLE IF NOT EXISTS file_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  file_id TEXT NOT NULL,
+  dress_id TEXT NOT NULL,
+  release TEXT NOT NULL DEFAULT '',
+  text TEXT NOT NULL,
+  by TEXT NOT NULL DEFAULT '',
+  at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_dresses_release ON dresses(release);
 CREATE INDEX IF NOT EXISTS idx_dresses_collection ON dresses(collection);
 CREATE INDEX IF NOT EXISTS idx_dresses_archived ON dresses(archived);
@@ -98,3 +114,4 @@ CREATE INDEX IF NOT EXISTS idx_log_scope ON log(scope);
 CREATE INDEX IF NOT EXISTS idx_file_reviews_dress ON file_reviews(dress_id);
 CREATE INDEX IF NOT EXISTS idx_file_reviews_release ON file_reviews(release);
 CREATE INDEX IF NOT EXISTS idx_review_links_release ON review_links(release);
+CREATE INDEX IF NOT EXISTS idx_file_comments_file ON file_comments(file_id);

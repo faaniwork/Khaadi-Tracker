@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, Trash2, ExternalLink, Folder, FileText, Loader2 } from "lucide-react";
+import { Check, X, MessageCircle, Trash2, ExternalLink, Folder, FileText, Loader2, Send } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import { driveThumbUrl } from "@/lib/api";
 import { FEEDBACK_REASONS } from "./reject-dialog";
 
 const REASON_LABEL = Object.fromEntries(FEEDBACK_REASONS.map((r) => [r.value, r.label]));
+
+const STATUS_STYLE = {
+  approved: { label: "Approved", color: "var(--good)", fg: "var(--good-foreground)" },
+  feedback: { label: "Feedback", color: "var(--warn)", fg: "var(--warn-foreground)" },
+  rejected: { label: "Rejected", color: "var(--destructive)", fg: "var(--destructive-foreground)" },
+};
 
 function humanSize(bytes) {
   if (bytes == null) return "";
@@ -15,28 +21,84 @@ function humanSize(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function CommentThread({ comments, canComment, posting, onAdd }) {
+  const [draft, setDraft] = useState("");
+  const submit = () => {
+    const text = draft.trim();
+    if (!text) return;
+    onAdd(text);
+    setDraft("");
+  };
+  return (
+    <div className="mt-1 pt-2 border-t border-border flex flex-col gap-1.5">
+      {comments.length ? (
+        <div className="flex flex-col gap-1.5 max-h-32 overflow-y-auto scrollbar-thin">
+          {comments.map((c) => (
+            <div key={c.id} className="text-[11px] leading-snug">
+              <span className="font-bold text-foreground">{c.by}</span>{" "}
+              <span className="text-muted-foreground">· {timeAgo(c.at)}</span>
+              <p className="text-foreground/90 break-words">{c.text}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">No comments yet.</p>
+      )}
+      {canComment ? (
+        <div className="flex items-center gap-1.5">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder="Add a comment…"
+            disabled={posting}
+            className="flex-1 min-w-0 rounded-lg border border-border bg-secondary/60 px-2 py-1 text-[11px] outline-none focus-visible:border-primary disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={posting || !draft.trim()}
+            aria-label="Send comment"
+            className="size-6 rounded-md grid place-items-center text-primary disabled:opacity-40"
+          >
+            <Send className="size-3.5" />
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * One Drive item in the grid: a folder to open, or a file with its preview
  * and whatever review state it carries.
  *
- * The border does the talking — green for approved, red for rejected — so a
- * client can see where a batch stands without reading a single label.
+ * The border does the talking — green for approved, amber for feedback, red
+ * for rejected — so a client can see where a batch stands without reading a
+ * single label.
  */
 export function FileTile({
   file,
   dressId,
   review,
+  comments,
   canWrite,
   canReview,
   busy,
+  postingComment,
   onOpenFolder,
   onOpenLightbox,
   onApprove,
+  onFeedback,
   onReject,
   onTrash,
+  onAddComment,
 }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const status = review?.status || "pending";
+  const commentList = comments || [];
 
   if (file.isFolder) {
     return (
@@ -53,17 +115,12 @@ export function FileTile({
     );
   }
 
-  const borderColor =
-    status === "approved"
-      ? "var(--good)"
-      : status === "rejected"
-      ? "var(--destructive)"
-      : "var(--border)";
+  const statusStyle = STATUS_STYLE[status];
 
   return (
     <div
       className="rounded-2xl border-2 bg-card overflow-hidden flex flex-col relative"
-      style={{ borderColor }}
+      style={{ borderColor: statusStyle?.color || "var(--border)" }}
     >
       <div className="relative aspect-square bg-secondary/60 flex items-center justify-center overflow-hidden">
         {file.isImage && !imgFailed ? (
@@ -86,15 +143,12 @@ export function FileTile({
           <FileText className="size-7 text-muted-foreground" />
         )}
 
-        {status !== "pending" ? (
+        {statusStyle ? (
           <span
             className="absolute top-2 left-2 f-mono text-[10px] font-bold px-2 py-0.5 rounded-full"
-            style={{
-              background: status === "approved" ? "var(--good)" : "var(--destructive)",
-              color: status === "approved" ? "var(--good-foreground)" : "var(--destructive-foreground)",
-            }}
+            style={{ background: statusStyle.color, color: statusStyle.fg }}
           >
-            {status === "approved" ? "Approved" : "Rejected"}
+            {statusStyle.label}
           </span>
         ) : null}
 
@@ -118,6 +172,10 @@ export function FileTile({
           <p className="text-[11px] leading-snug" style={{ color: "var(--destructive)" }}>
             <span className="font-bold">{REASON_LABEL[review.reason] || review.reason}</span>
             {review.text ? ` — ${review.text}` : ""}
+          </p>
+        ) : status === "feedback" && review?.text ? (
+          <p className="text-[11px] leading-snug" style={{ color: "var(--warn-foreground)" }}>
+            {review.text}
           </p>
         ) : null}
 
@@ -144,6 +202,21 @@ export function FileTile({
                 }
               >
                 <Check className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onFeedback?.(file)}
+                title={status === "feedback" ? "Has feedback — click to change the note" : "Leave feedback"}
+                aria-label="Leave feedback"
+                className="size-7 rounded-lg grid place-items-center border transition-colors disabled:opacity-50"
+                style={
+                  status === "feedback"
+                    ? { background: "var(--warn)", color: "var(--warn-foreground)", borderColor: "var(--warn)" }
+                    : { borderColor: "var(--border)", color: "var(--warn)" }
+                }
+              >
+                <MessageCircle className="size-3.5" />
               </button>
               <button
                 type="button"
@@ -182,6 +255,18 @@ export function FileTile({
             </a>
           ) : null}
 
+          <button
+            type="button"
+            onClick={() => setShowComments((s) => !s)}
+            title="Comments"
+            aria-label="Comments"
+            className={`h-7 px-2 rounded-lg grid grid-flow-col items-center gap-1 border text-[11px] font-bold ml-auto ${
+              showComments ? "border-primary text-primary" : "border-border text-muted-foreground"
+            }`}
+          >
+            <MessageCircle className="size-3.5" /> {commentList.length || ""}
+          </button>
+
           {canWrite ? (
             <button
               type="button"
@@ -189,12 +274,21 @@ export function FileTile({
               onClick={() => onTrash?.(file)}
               title="Move to Drive trash"
               aria-label="Move to Drive trash"
-              className="size-7 rounded-lg grid place-items-center border border-border text-muted-foreground hover:text-destructive ml-auto disabled:opacity-50"
+              className="size-7 rounded-lg grid place-items-center border border-border text-muted-foreground hover:text-destructive disabled:opacity-50"
             >
               <Trash2 className="size-3.5" />
             </button>
           ) : null}
         </div>
+
+        {showComments ? (
+          <CommentThread
+            comments={commentList}
+            canComment={canReview}
+            posting={postingComment}
+            onAdd={(text) => onAddComment?.(file, text)}
+          />
+        ) : null}
       </div>
     </div>
   );

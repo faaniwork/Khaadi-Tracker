@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { moveToRejected, moveOutOfRejected, assertFileInDress } from '@/lib/drive';
-import { setFileReview, getFileReview, validateReviewDecision } from '@/lib/db';
+import { setFileReview, getFileReview, validateReviewDecision, addFileComment } from '@/lib/db';
 import { resolveCaller, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
-const DECISIONS = ['approved', 'rejected', 'pending'];
+const DECISIONS = ['approved', 'feedback', 'rejected', 'pending'];
 
 /**
  * POST /api/drive/review
  *   { dressId, fileId, decision, reason?, feedbackText? }
+ *   decision is one of 'approved' | 'feedback' | 'rejected' | 'pending'.
  *
  * Open to clients holding a review link for this batch, and to signed-in
  * editors and admins recording a decision themselves. Signed-in viewers
@@ -79,7 +80,21 @@ export async function POST(req) {
       by: caller.by,
     });
 
-    return NextResponse.json({ review, moved, dress });
+    // A feedback note is also the opening message of that file's comment
+    // thread, so the decision and the conversation about it read as one
+    // continuous thing rather than a status with a hidden note behind it.
+    let comment = null;
+    if (decision === 'feedback' && validated.text) {
+      comment = await addFileComment({
+        fileId,
+        dressId: dress.id,
+        release: dress.release,
+        text: validated.text,
+        by: caller.by,
+      });
+    }
+
+    return NextResponse.json({ review, moved, dress, comment });
   } catch (e) {
     const status = statusForError(e);
     if (status >= 500) console.error('drive review failed', e);

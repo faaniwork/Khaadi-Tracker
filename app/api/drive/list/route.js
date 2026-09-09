@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listFolder, listDressFiles, isWithinDress } from '@/lib/drive';
-import { getReviewsForDress } from '@/lib/db';
+import { getReviewsForDress, getCommentsForDress } from '@/lib/db';
 import { resolveCaller, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 /**
@@ -45,12 +45,13 @@ export async function GET(req) {
     }
 
     const isRoot = target === dress.id;
-    const [files, reviews] = await Promise.all([
+    const [files, reviews, comments] = await Promise.all([
       // At the dress folder itself, rejected images are folded back in so
       // they stay visible and a decision stays reversible. Deeper subfolders
       // are listed plainly.
       isRoot ? listDressFiles(dress.id) : listFolder(target),
       getReviewsForDress(dress.id),
+      getCommentsForDress(dress.id),
     ]);
 
     return NextResponse.json({
@@ -59,7 +60,9 @@ export async function GET(req) {
       isRoot,
       files,
       reviews,
+      comments,
       canWrite: caller.canWrite,
+      canReview: caller.canReview,
       callerKind: caller.kind,
     });
   } catch (e) {

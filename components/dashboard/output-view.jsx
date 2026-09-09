@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { ChevronRight, Layers, Shirt, Images } from "lucide-react";
-import { sortReleasesByRecency } from "@/lib/constants";
+import { sortReleasesByRecency, STATUS_OPTIONS } from "@/lib/constants";
+import { Select } from "@/components/ui/input";
 import { DressFiles } from "./files";
 
 /**
@@ -19,15 +20,24 @@ export function OutputView({ rows, showToast }) {
   const [release, setRelease] = useState(null);
   const [collection, setCollection] = useState(null);
   const [dress, setDress] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("");
+
+  // One filter, applied at every level: a release or collection still shows
+  // up as long as at least one of its dresses matches, so narrowing to
+  // "Needs Revision" surfaces exactly the batches that need attention
+  // instead of hiding everything down to an empty screen.
+  const matches = (r) => !statusFilter || (r.status || "Not Started") === statusFilter;
 
   const releases = useMemo(() => {
-    const set = [...new Set(rows.map((r) => r.release || "Unsorted"))];
+    const set = [...new Set(rows.filter(matches).map((r) => r.release || "Unsorted"))];
     return sortReleasesByRecency(set);
-  }, [rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, statusFilter]);
 
   const releaseRows = useMemo(
-    () => (release ? rows.filter((r) => (r.release || "Unsorted") === release) : []),
-    [rows, release]
+    () => (release ? rows.filter((r) => (r.release || "Unsorted") === release && matches(r)) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rows, release, statusFilter]
   );
   const collections = useMemo(() => {
     const map = {};
@@ -85,6 +95,16 @@ export function OutputView({ rows, showToast }) {
             <ChevronRight className="size-3.5 text-muted-foreground" />
             <span className="text-sm font-bold text-foreground">{dress.dress}</span>
           </>
+        ) : null}
+        {!dress ? (
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="ml-auto text-xs">
+            <option value="">All statuses</option>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
         ) : null}
       </div>
 
@@ -154,7 +174,7 @@ export function OutputView({ rows, showToast }) {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {releases.map((rel) => {
-            const rr = rows.filter((r) => (r.release || "Unsorted") === rel);
+            const rr = rows.filter((r) => (r.release || "Unsorted") === rel && matches(r));
             const delivered = rr.filter((r) => r.status === "Delivered").length;
             const cols = new Set(rr.map((r) => r.collection || "Unsorted")).size;
             return (

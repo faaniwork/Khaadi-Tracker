@@ -8,14 +8,25 @@ import {
   driveCreateFolder,
   driveTrashFile,
   driveReview,
+  driveComment,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/input";
 import { FileTile } from "@/components/files/file-tile";
 import { RejectDialog } from "@/components/files/reject-dialog";
+import { FeedbackDialog } from "@/components/files/feedback-dialog";
 import { Dropzone } from "@/components/files/dropzone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Lightbox } from "@/components/files/lightbox";
+
+const STATUS_FILTERS = [
+  { value: "", label: "All" },
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "feedback", label: "Feedback" },
+  { value: "rejected", label: "Rejected" },
+];
 
 /**
  * The team's file browser for one dress, backed by its Drive folder.
@@ -29,18 +40,23 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   // passes both separately: a client can approve/reject but never upload,
   // trash, or create a folder.
   const reviewAllowed = canReview ?? canWrite;
-  const [state, setState] = useState({ folderId: null, error: "", files: [], reviews: {} });
+  const [state, setState] = useState({ folderId: null, error: "", files: [], reviews: {}, comments: {} });
   const [refreshing, setRefreshing] = useState(false);
   const [trail, setTrail] = useState([]); // subfolders opened below the dress folder
   const [upload, setUpload] = useState({ active: false, progress: 0 });
   const [busyIds, setBusyIds] = useState(() => new Set());
+  const [postingCommentIds, setPostingCommentIds] = useState(() => new Set());
   const [rejecting, setRejecting] = useState(null);
   const [rejectError, setRejectError] = useState("");
   const [savingReject, setSavingReject] = useState(false);
+  const [feedbacking, setFeedbacking] = useState(null);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [savingFeedback, setSavingFeedback] = useState(false);
   const [confirmTrash, setConfirmTrash] = useState(null);
   const [newFolder, setNewFolder] = useState("");
   const [creating, setCreating] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("");
 
   const currentFolder = trail.length ? trail[trail.length - 1].id : dress.id;
   const atRoot = trail.length === 0;
@@ -53,11 +69,17 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       driveList({ dressId: dress.id, folderId })
         .then((data) => {
           if (isStale?.()) return;
-          setState({ folderId, error: "", files: data.files || [], reviews: data.reviews || {} });
+          setState({
+            folderId,
+            error: "",
+            files: data.files || [],
+            reviews: data.reviews || {},
+            comments: data.comments || {},
+          });
         })
         .catch((e) => {
           if (isStale?.()) return;
-          setState({ folderId, error: e.message || "Could not load the folder", files: [], reviews: {} });
+          setState({ folderId, error: e.message || "Could not load the folder", files: [], reviews: {}, comments: {} });
         })
         .finally(() => setRefreshing(false)),
     [dress.id]
@@ -116,6 +138,12 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const setReviewLocal = (fileId, review) =>
     setState((s) => ({ ...s, reviews: { ...s.reviews, [fileId]: review } }));
 
+  const addCommentLocal = (fileId, comment) =>
+    setState((s) => ({
+      ...s,
+      comments: { ...s.comments, [fileId]: [...(s.comments[fileId] || []), comment] },
+    }));
+
   const onApprove = async (file) => {
     const already = state.reviews[file.id]?.status === "approved";
     markBusy(file.id, true);
@@ -160,6 +188,45 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     }
   };
 
+  const submitFeedback = async ({ text }) => {
+    const file = feedbacking;
+    setSavingFeedback(true);
+    setFeedbackError("");
+    try {
+      const res = await driveReview({
+        dressId: dress.id,
+        fileId: file.id,
+        fileName: file.name,
+        decision: "feedback",
+        feedbackText: text,
+      });
+      setReviewLocal(file.id, res.review);
+      if (res.comment) addCommentLocal(file.id, res.comment);
+      setFeedbacking(null);
+      if (res.moved) load(currentFolder);
+    } catch (e) {
+      setFeedbackError(e.message || "Could not save that");
+    } finally {
+      setSavingFeedback(false);
+    }
+  };
+
+  const addComment = async (file, text) => {
+    setPostingCommentIds((prev) => new Set(prev).add(file.id));
+    try {
+      const res = await driveComment({ dressId: dress.id, fileId: file.id, text });
+      addCommentLocal(file.id, res.comment);
+    } catch (e) {
+      showToast?.(e.message || "Could not post that comment", "error");
+    } finally {
+      setPostingCommentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(file.id);
+        return next;
+      });
+    }
+  };
+
   const doTrash = async () => {
     const file = confirmTrash;
     setConfirmTrash(null);
@@ -193,11 +260,16 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const counts = Object.values(state.reviews).reduce(
     (acc, r) => {
       if (r.status === "approved") acc.approved++;
+      else if (r.status === "feedback") acc.feedback++;
       else if (r.status === "rejected") acc.rejected++;
       return acc;
     },
-    { approved: 0, rejected: 0 }
+    { approved: 0, feedback: 0, rejected: 0 }
   );
+
+  const visibleFiles = statusFilter
+    ? state.files.filter((f) => f.isFolder || (state.reviews[f.id]?.status || "pending") === statusFilter)
+    : state.files;
 
   return (
     <div className="rounded-[20px] border border-border bg-card p-5 mb-5 rise">
@@ -214,10 +286,18 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
             {dress.collection} · {state.files.filter((f) => !f.isFolder).length} file
             {state.files.filter((f) => !f.isFolder).length === 1 ? "" : "s"}
             {counts.approved ? ` · ${counts.approved} approved` : ""}
+            {counts.feedback ? ` · ${counts.feedback} feedback` : ""}
             {counts.rejected ? ` · ${counts.rejected} rejected` : ""}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-xs">
+            {STATUS_FILTERS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </Select>
           {trail.length ? (
             <Button variant="ghost" size="sm" onClick={() => setTrail((t) => t.slice(0, -1))}>
               <Folder className="size-3.5" /> Up
@@ -267,32 +347,39 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         <div className="py-10 grid place-items-center text-muted-foreground">
           <Loader2 className="size-5 animate-spin" />
         </div>
-      ) : !state.files.length && !state.error ? (
+      ) : !visibleFiles.length && !state.error ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Nothing in this folder yet.
+          {state.files.length ? "No files match that filter." : "Nothing in this folder yet."}
         </p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mt-4">
-          {state.files.map((f) => (
+          {visibleFiles.map((f) => (
             <FileTile
               key={f.id}
               file={f}
               dressId={dress.id}
               review={state.reviews[f.id]}
+              comments={state.comments[f.id]}
               canWrite={canWrite}
               canReview={reviewAllowed}
               busy={busyIds.has(f.id)}
+              postingComment={postingCommentIds.has(f.id)}
               onOpenFolder={(folder) => setTrail((t) => [...t, { id: folder.id, name: folder.name }])}
               onOpenLightbox={(f) => {
-                const images = state.files.filter((x) => !x.isFolder && x.isImage);
+                const images = visibleFiles.filter((x) => !x.isFolder && x.isImage);
                 setLightboxIndex(images.findIndex((x) => x.id === f.id));
               }}
               onApprove={onApprove}
+              onFeedback={(file) => {
+                setFeedbackError("");
+                setFeedbacking(file);
+              }}
               onReject={(file) => {
                 setRejectError("");
                 setRejecting(file);
               }}
               onTrash={(file) => setConfirmTrash(file)}
+              onAddComment={addComment}
             />
           ))}
         </div>
@@ -307,6 +394,15 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         onSubmit={submitReject}
         onCancel={() => setRejecting(null)}
       />
+      <FeedbackDialog
+        key={feedbacking?.id || "none-feedback"}
+        open={Boolean(feedbacking)}
+        fileName={feedbacking?.name || ""}
+        saving={savingFeedback}
+        error={feedbackError}
+        onSubmit={submitFeedback}
+        onCancel={() => setFeedbacking(null)}
+      />
       <ConfirmDialog
         open={Boolean(confirmTrash)}
         title="Move this file to Drive trash?"
@@ -317,11 +413,26 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       />
       {lightboxIndex != null ? (
         <Lightbox
-          files={state.files}
+          files={visibleFiles}
           dressId={dress.id}
           index={lightboxIndex}
+          reviews={state.reviews}
+          comments={state.comments}
+          canReview={reviewAllowed}
+          busyIds={busyIds}
+          postingCommentIds={postingCommentIds}
           onClose={() => setLightboxIndex(null)}
           onIndexChange={setLightboxIndex}
+          onApprove={onApprove}
+          onFeedback={(file) => {
+            setFeedbackError("");
+            setFeedbacking(file);
+          }}
+          onReject={(file) => {
+            setRejectError("");
+            setRejecting(file);
+          }}
+          onAddComment={addComment}
         />
       ) : null}
     </div>
