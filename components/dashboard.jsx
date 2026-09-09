@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ShieldCheck } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Activity, ShieldCheck, Images, Sun, Moon, LogOut } from "lucide-react";
 import { moodFor, mascotMessage, FUN_MESSAGES, sortReleasesByRecency } from "@/lib/constants";
 import {
   fetchBoard,
@@ -25,6 +26,8 @@ import { SearchResults } from "@/components/dashboard/search-results";
 import { ActivityPage } from "@/components/dashboard/activity";
 import { ProfileDialog } from "@/components/dashboard/profile-dialog";
 import { AccessPage } from "@/components/dashboard/access";
+import { OutputView } from "@/components/dashboard/output-view";
+import { Logo } from "@/components/ui/logo";
 
 const POLL_MS = 15000;
 const BATCHES_PER_PAGE = 9;
@@ -65,9 +68,6 @@ function batchStats(rows, rel) {
 }
 function costForRelease(costs, rel) {
   return Number(costs.batches?.[rel]) || 0;
-}
-function costForCollection(costs, col) {
-  return Number(costs.collections?.[col]) || 0;
 }
 function totalCost(costs) {
   const b = Object.values(costs.batches || {}).reduce((a, v) => a + (Number(v) || 0), 0);
@@ -541,7 +541,7 @@ export function Dashboard({ user }) {
 
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
-    else if (target === "activity" || target === "access") setView({ page: target, batch: null });
+    else if (target === "activity" || target === "access" || target === "outputs") setView({ page: target, batch: null });
     else setView({ page: "batch", batch: target });
     setSearch("");
     setStatusFilter("");
@@ -558,6 +558,7 @@ export function Dashboard({ user }) {
         return { id: r, label: r, pct: s.pct, discarded: s.allDiscarded };
       }),
       { id: "activity", label: "Activity", icon: Activity },
+      { id: "outputs", label: "Outputs", icon: Images },
     ];
     if (role === "admin") items.push({ id: "access", label: "Access", icon: ShieldCheck });
     return items;
@@ -588,6 +589,41 @@ export function Dashboard({ user }) {
     : savingCount
     ? { text: `Saving ${savingCount}…`, kind: "saving", onClick: undefined }
     : null;
+
+  // A client account never sees the team's dashboard at all — no credits, no
+  // revisions, no batch editing, none of the internal tracking chrome. Just
+  // batches, collections, dresses, and the images inside them.
+  if (role === "client") {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="flex items-center gap-3 px-4 sm:px-6 py-3.5 border-b border-border bg-card sticky top-0 z-10">
+          <Logo width={40} />
+          <span className="f-heading font-bold text-sm text-foreground">Outputs</span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              className="size-8 rounded-lg grid place-items-center border border-border text-muted-foreground hover:text-foreground"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="rounded-lg border border-border text-xs font-bold px-3 py-2 flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="size-3.5" /> Sign out
+            </button>
+          </div>
+        </header>
+        <main className="p-4 sm:p-6">
+          <OutputView rows={rows} showToast={showToast} />
+        </main>
+        <Toast {...toast} />
+      </div>
+    );
+  }
 
   const searching = search.trim() || statusFilter;
   const activeNavId = view.page === "batch" ? view.batch : view.page;
@@ -677,6 +713,8 @@ export function Dashboard({ user }) {
             <ActivityPage profiles={profiles} />
           ) : view.page === "access" ? (
             <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
+          ) : view.page === "outputs" ? (
+            <OutputView rows={rows} showToast={showToast} />
           ) : (
             <BatchPage
               rel={view.batch}
@@ -684,7 +722,6 @@ export function Dashboard({ user }) {
               collections={collectionsFor(rows, view.batch)}
               notesForBatch={notes.batches?.[view.batch]}
               cost={costForRelease(costs, view.batch)}
-              costForCollection={(col) => costForCollection(costs, col)}
               canEdit={canEdit}
               sync={sync}
               expandedCols={expandedCols}
@@ -696,7 +733,6 @@ export function Dashboard({ user }) {
               onBulkStatus={requestBulkStatus}
               onAddNote={onAddNote}
               onRenameCollection={onRenameCollection}
-              role={role}
               driveSync={driveSync[view.batch]}
               onResync={onResync}
               resyncing={resyncing === view.batch}

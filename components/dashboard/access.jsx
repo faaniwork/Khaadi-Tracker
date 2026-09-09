@@ -8,8 +8,9 @@ import { fetchAccess, saveAccess, deleteAccess } from "@/lib/api";
 
 const ROLE_HINT = {
   admin: "Full access — can edit everything and manage who has access.",
-  editor: "Can edit statuses, comments, credits and revisions.",
+  editor: "Can edit statuses, comments and credits on the dashboard.",
   viewer: "Read-only — sees everything live but can't make changes.",
+  client: "Outputs only — can browse batches and approve or reject images, nothing else.",
 };
 
 export function AccessPage({ role, currentEmail, showToast }) {
@@ -118,6 +119,7 @@ export function AccessPage({ role, currentEmail, showToast }) {
           <option value="viewer">Viewer</option>
           <option value="editor">Editor</option>
           <option value="admin">Admin</option>
+          <option value="client">Client</option>
         </Select>
         <Input
           type="text"
@@ -168,6 +170,7 @@ export function AccessPage({ role, currentEmail, showToast }) {
                       <option value="viewer">Viewer</option>
                       <option value="editor">Editor</option>
                       <option value="admin">Admin</option>
+                      <option value="client">Client</option>
                     </Select>
                   </td>
                   <td className="py-2.5 px-3 text-xs text-muted-foreground max-w-[220px] truncate" title={r.notes}>

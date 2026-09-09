@@ -30,6 +30,7 @@ export function FileTile({
   canReview,
   busy,
   onOpenFolder,
+  onOpenLightbox,
   onApprove,
   onReject,
   onTrash,
@@ -64,16 +65,23 @@ export function FileTile({
       className="rounded-2xl border-2 bg-card overflow-hidden flex flex-col relative"
       style={{ borderColor }}
     >
-      <div className="relative aspect-square bg-secondary/60 flex items-center justify-center">
+      <div className="relative aspect-square bg-secondary/60 flex items-center justify-center overflow-hidden">
         {file.isImage && !imgFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={driveThumbUrl({ fileId: file.id, dressId })}
-            alt={file.name}
-            loading="lazy"
-            onError={() => setImgFailed(true)}
-            className="absolute inset-0 size-full object-cover"
-          />
+          <button
+            type="button"
+            onClick={() => onOpenLightbox?.(file)}
+            aria-label={`View ${file.name} full screen`}
+            className="absolute inset-0 size-full group"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={driveThumbUrl({ fileId: file.id, dressId })}
+              alt={file.name}
+              loading="lazy"
+              onError={() => setImgFailed(true)}
+              className="absolute inset-0 size-full object-cover transition-transform duration-300 ease-out group-hover:scale-110"
+            />
+          </button>
         ) : (
           <FileText className="size-7 text-muted-foreground" />
         )}
@@ -159,7 +167,9 @@ export function FileTile({
             </>
           ) : null}
 
-          {file.webViewLink ? (
+          {/* Drive is where the team manages files, not where a client
+              should ever need to go — this stays admin/editor only. */}
+          {file.webViewLink && canWrite ? (
             <a
               href={file.webViewLink}
               target="_blank"

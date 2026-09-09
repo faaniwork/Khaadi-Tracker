@@ -15,6 +15,7 @@ import { FileTile } from "@/components/files/file-tile";
 import { RejectDialog } from "@/components/files/reject-dialog";
 import { Dropzone } from "@/components/files/dropzone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Lightbox } from "@/components/files/lightbox";
 
 /**
  * The team's file browser for one dress, backed by its Drive folder.
@@ -22,7 +23,12 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
  * The dress row's id IS its Drive folder id, so no mapping table is needed to
  * get from a row on the board to the actual folder.
  */
-export function DressFiles({ dress, canWrite, onClose, showToast }) {
+export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
+  // Most callers (the team's own dashboard) only ever pass canWrite, where
+  // review and write are the same permission. The client-facing output view
+  // passes both separately: a client can approve/reject but never upload,
+  // trash, or create a folder.
+  const reviewAllowed = canReview ?? canWrite;
   const [state, setState] = useState({ folderId: null, error: "", files: [], reviews: {} });
   const [refreshing, setRefreshing] = useState(false);
   const [trail, setTrail] = useState([]); // subfolders opened below the dress folder
@@ -34,6 +40,7 @@ export function DressFiles({ dress, canWrite, onClose, showToast }) {
   const [confirmTrash, setConfirmTrash] = useState(null);
   const [newFolder, setNewFolder] = useState("");
   const [creating, setCreating] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(null);
 
   const currentFolder = trail.length ? trail[trail.length - 1].id : dress.id;
   const atRoot = trail.length === 0;
@@ -273,9 +280,13 @@ export function DressFiles({ dress, canWrite, onClose, showToast }) {
               dressId={dress.id}
               review={state.reviews[f.id]}
               canWrite={canWrite}
-              canReview={canWrite}
+              canReview={reviewAllowed}
               busy={busyIds.has(f.id)}
               onOpenFolder={(folder) => setTrail((t) => [...t, { id: folder.id, name: folder.name }])}
+              onOpenLightbox={(f) => {
+                const images = state.files.filter((x) => !x.isFolder && x.isImage);
+                setLightboxIndex(images.findIndex((x) => x.id === f.id));
+              }}
               onApprove={onApprove}
               onReject={(file) => {
                 setRejectError("");
@@ -304,6 +315,15 @@ export function DressFiles({ dress, canWrite, onClose, showToast }) {
         onConfirm={doTrash}
         onCancel={() => setConfirmTrash(null)}
       />
+      {lightboxIndex != null ? (
+        <Lightbox
+          files={state.files}
+          dressId={dress.id}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onIndexChange={setLightboxIndex}
+        />
+      ) : null}
     </div>
   );
 }

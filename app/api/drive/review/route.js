@@ -34,7 +34,7 @@ const DECISIONS = ['approved', 'rejected', 'pending'];
 export async function POST(req) {
   try {
     const caller = await resolveCaller(req);
-    if (caller.kind === 'user' && !caller.canWrite) {
+    if (caller.kind === 'user' && !caller.canReview) {
       return NextResponse.json(
         { error: 'VIEW_ONLY: You have view-only access, so you cannot record review decisions.' },
         { status: 403 }

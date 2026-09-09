@@ -4,7 +4,6 @@ import { timeAgo } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SyncDot } from "@/components/ui/sync-dot";
-import { NumberStepper } from "@/components/ui/stepper";
 import { StatusSelect, BulkStatusControl } from "./status-select";
 
 export function CostInput({ scope, keyName, value, syncState, disabled, onChange, onRetry }) {
@@ -73,24 +72,6 @@ export function DressRow({ row, disabled, syncState, onFieldChange, onRetry, onO
           </div>
         ) : null}
       </td>
-      <td className="py-3 px-4">
-        <input
-          type="number"
-          min="0"
-          defaultValue={row.credits != null ? row.credits : 0}
-          disabled={disabled}
-          onBlur={(e) => onFieldChange(row.id, "credits", e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          className="rounded-[10px] border border-border bg-secondary/60 f-mono text-xs px-2 py-1.5 w-16 outline-none focus-visible:border-primary disabled:opacity-60"
-        />
-      </td>
-      <td className="py-3 px-4">
-        <NumberStepper
-          value={row.revisions != null ? row.revisions : 1}
-          disabled={disabled}
-          onChange={(n) => onFieldChange(row.id, "revisions", n)}
-        />
-      </td>
     </tr>
   );
 }
@@ -102,13 +83,10 @@ export function CollectionCard({
   isOpen,
   onToggle,
   colLink,
-  cost,
   canEdit,
   sync,
   onFieldChange,
   onRetry,
-  onCostChange,
-  onCostRetry,
   onBulkStatus,
   onRenameCollection,
   onOpenFiles,
@@ -216,15 +194,6 @@ export function CollectionCard({
         </div>
         <div className="flex items-center gap-2 flex-wrap ml-auto">
           <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("collection", `${rel}␟${col}`, status, colRows.length)} />
-          <CostInput
-            scope="collection"
-            keyName={col}
-            value={cost}
-            syncState={sync[`cost:collection:${col}`] || "idle"}
-            disabled={!canEdit}
-            onChange={onCostChange}
-            onRetry={() => onCostRetry("collection", col)}
-          />
           {colLink ? (
             <a href={colLink} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-secondary border border-border text-foreground text-xs px-2.5 py-1.5 flex items-center gap-1">
               <ExternalLink className="size-3" />
@@ -237,7 +206,7 @@ export function CollectionCard({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["Dress", "Status", "Files", "Comments", "Credits", "Revisions"].map((h) => (
+                {["Dress", "Status", "Files", "Comments"].map((h) => (
                   <th key={h} className="text-left text-[10.5px] font-bold uppercase tracking-wide px-4 py-2 text-muted-foreground">
                     {h}
                   </th>

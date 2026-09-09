@@ -22,6 +22,7 @@ export async function GET(req) {
     const url = new URL(req.url);
     const fileId = url.searchParams.get('fileId');
     const dressId = url.searchParams.get('dressId');
+    const size = url.searchParams.get('size');
 
     if (!fileId || !dressId) {
       return new Response('fileId and dressId are required', { status: 400 });
@@ -33,7 +34,7 @@ export async function GET(req) {
     // allows subfolders, which a flat parent comparison did not.
     await assertFileInDress({ fileId, dressFolderId: dress.id });
 
-    const { body, contentType } = await fetchPreviewBytes(fileId);
+    const { body, contentType } = await fetchPreviewBytes(fileId, undefined, size);
     const webStream = typeof body?.getReader === 'function' ? body : Readable.toWeb(body);
 
     return new Response(webStream, {

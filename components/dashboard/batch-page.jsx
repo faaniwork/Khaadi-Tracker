@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { BulkStatusControl } from "./status-select";
 import { CostInput, CollectionCard, NotesCard } from "./dress-table";
 import { DressFiles } from "./files";
-import { ReviewLinksCard } from "./review-links";
 
 export function BatchPage({
   rel,
@@ -16,7 +15,6 @@ export function BatchPage({
   collections,
   notesForBatch,
   cost,
-  costForCollection,
   canEdit,
   sync,
   expandedCols,
@@ -28,7 +26,6 @@ export function BatchPage({
   onBulkStatus,
   onAddNote,
   onRenameCollection,
-  role,
   driveSync,
   onResync,
   resyncing,
@@ -160,8 +157,6 @@ export function BatchPage({
         />
       ) : null}
 
-      {role === "admin" ? <ReviewLinksCard release={rel} showToast={showToast} /> : null}
-
       <NotesCard rel={rel} list={notesForBatch} canEdit={canEdit} onAddNote={onAddNote} />
 
       {colKeys.map((col) => {
@@ -175,13 +170,10 @@ export function BatchPage({
             isOpen={expandedCols.has(key)}
             onToggle={() => onToggleCol(key)}
             colLink={COLLECTION_LINKS[col]}
-            cost={costForCollection(col)}
             canEdit={canEdit}
             sync={sync}
             onFieldChange={onFieldChange}
             onRetry={onRetry}
-            onCostChange={onCostChange}
-            onCostRetry={onCostRetry}
             onBulkStatus={onBulkStatus}
             onRenameCollection={onRenameCollection}
             onOpenFiles={setOpenFiles}
