@@ -1,8 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RELEASE_ORDER, moodFor, mascotMessage, FUN_MESSAGES } from "@/lib/constants";
-import { fetchBoard, saveDressField, saveBulkStatus, saveCost, saveNote, syncToSheet } from "@/lib/api";
+import { Activity, ShieldCheck } from "lucide-react";
+import { moodFor, mascotMessage, FUN_MESSAGES, sortReleasesByRecency } from "@/lib/constants";
+import {
+  fetchBoard,
+  saveDressField,
+  saveBulkStatus,
+  saveCost,
+  saveNote,
+  syncToSheet,
+  renameCollection as renameCollectionApi,
+} from "@/lib/api";
 import { burstConfetti } from "@/lib/confetti-bus";
 import { ConfettiCanvas } from "@/components/confetti-canvas";
 import { Toast } from "@/components/toast";
@@ -12,12 +21,15 @@ import { Header } from "@/components/dashboard/header";
 import { OverviewStats, OverviewChart, BatchCard } from "@/components/dashboard/overview";
 import { BatchPage } from "@/components/dashboard/batch-page";
 import { SearchResults } from "@/components/dashboard/search-results";
+import { ActivityPage } from "@/components/dashboard/activity";
+import { AccessPage } from "@/components/dashboard/access";
 
 const POLL_MS = 15000;
+const BATCHES_PER_PAGE = 9;
 
 function releasesPresent(rows) {
   const set = [...new Set(rows.map((r) => r.release || "Unsorted"))];
-  return RELEASE_ORDER.filter((r) => set.includes(r)).concat(set.filter((r) => !RELEASE_ORDER.includes(r)));
+  return sortReleasesByRecency(set);
 }
 function rowsFor(rows, rel) {
   return rows.filter((r) => (r.release || "Unsorted") === rel);
@@ -58,6 +70,7 @@ export function Dashboard({ user }) {
   const [theme, setTheme] = useState("light");
   const [bulkConfirm, setBulkConfirm] = useState(null); // { scope, key, status, count }
   const [sheetSyncing, setSheetSyncing] = useState(false);
+  const [visibleBatches, setVisibleBatches] = useState(BATCHES_PER_PAGE);
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -205,7 +218,8 @@ export function Dashboard({ user }) {
         showToast("View-only access — ask an admin to make you an editor", "error");
         return;
       }
-      const nextValue = field === "credits" ? Number(value) || 0 : value;
+      const nextValue =
+        field === "credits" ? Number(value) || 0 : field === "revisions" ? Math.max(1, Math.min(9, Number(value) || 1)) : value;
       dirtyRows.current.add(folderId);
       setRows((prev) =>
         prev.map((r) =>
@@ -424,6 +438,27 @@ export function Dashboard({ user }) {
     });
   }, []);
 
+  const onRenameCollection = useCallback(
+    async (release, oldName, newName) => {
+      if (!canEdit) {
+        showToast("View-only access — ask an admin to make you an editor", "error");
+        return;
+      }
+      try {
+        await renameCollectionApi({ release, oldName, newName });
+        setRows((prev) =>
+          prev.map((r) => (r.release === release && r.collection === oldName ? { ...r, collection: newName } : r))
+        );
+        showToast(`Renamed "${oldName}" to "${newName}"`);
+        loadData(true);
+      } catch (e) {
+        console.error("rename collection failed", e);
+        showToast(e.message || "Rename failed", "error");
+      }
+    },
+    [canEdit, showToast, loadData]
+  );
+
   const onSyncSheet = useCallback(async () => {
     if (sheetSyncing) return;
     setSheetSyncing(true);
@@ -439,7 +474,9 @@ export function Dashboard({ user }) {
   }, [sheetSyncing, showToast]);
 
   const onNav = useCallback((target) => {
-    setView(target === "overview" ? { page: "overview", batch: null } : { page: "batch", batch: target });
+    if (target === "overview") setView({ page: "overview", batch: null });
+    else if (target === "activity" || target === "access") setView({ page: target, batch: null });
+    else setView({ page: "batch", batch: target });
     setSearch("");
     setStatusFilter("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -447,17 +484,19 @@ export function Dashboard({ user }) {
 
   // ---------- derived data ----------
   const releases = useMemo(() => releasesPresent(rows), [rows]);
-  const navItems = useMemo(
-    () => [
+  const navItems = useMemo(() => {
+    const items = [
       { id: "overview", label: "All" },
       ...releases.map((r) => {
         const rr = rowsFor(rows, r);
         const pct = rr.length ? (rr.filter((x) => x.status === "Delivered").length / rr.length) * 100 : 0;
         return { id: r, label: r, pct };
       }),
-    ],
-    [releases, rows]
-  );
+      { id: "activity", label: "Activity", icon: Activity },
+    ];
+    if (role === "admin") items.push({ id: "access", label: "Access", icon: ShieldCheck });
+    return items;
+  }, [releases, rows, role]);
 
   const deliveredMood = moodFor(
     Math.min(100, (rows.filter((r) => r.status === "Delivered").length / 1000) * 100)
@@ -486,13 +525,13 @@ export function Dashboard({ user }) {
     : null;
 
   const searching = search.trim() || statusFilter;
-  const activeBatch = view.page === "batch" ? view.batch : null;
+  const activeNavId = view.page === "batch" ? view.batch : view.page;
 
   return (
     <div className="flex min-h-screen bg-background">
-      <Sidebar items={navItems} active={{ id: activeBatch || "overview" }} onNav={onNav} />
+      <Sidebar items={navItems} active={{ id: activeNavId }} onNav={onNav} />
       <div className="flex-1 min-w-0 flex flex-col">
-        <MobileNav items={navItems} active={{ id: activeBatch || "overview" }} onNav={onNav} />
+        <MobileNav items={navItems} active={{ id: activeNavId }} onNav={onNav} />
         <Header
           view={view}
           onBack={() => onNav("overview")}
@@ -525,35 +564,52 @@ export function Dashboard({ user }) {
               <OverviewStats rows={rows} totalCost={totalCost(costs)} mascot={mascotState} onMascotClick={onMascotClick} />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
               {releases.length ? (
-                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {releases.map((rel) => {
-                    const rr = rowsFor(rows, rel);
-                    const cols = collectionsFor(rows, rel);
-                    const noteCount = (notes.batches && notes.batches[rel] || []).length;
-                    return (
-                      <BatchCard
-                        key={rel}
-                        rel={rel}
-                        rr={rr}
-                        colCount={Object.keys(cols).length}
-                        noteCount={noteCount}
-                        cost={costForRelease(costs, rel)}
-                        canEdit={canEdit}
-                        sync={sync}
-                        onNav={onNav}
-                        onBulkStatus={requestBulkStatus}
-                        onCostChange={onCostChange}
-                        onCostRetry={retryCost}
-                      />
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {releases.slice(0, visibleBatches).map((rel) => {
+                      const rr = rowsFor(rows, rel);
+                      const cols = collectionsFor(rows, rel);
+                      const noteCount = (notes.batches && notes.batches[rel] || []).length;
+                      return (
+                        <BatchCard
+                          key={rel}
+                          rel={rel}
+                          rr={rr}
+                          colCount={Object.keys(cols).length}
+                          noteCount={noteCount}
+                          cost={costForRelease(costs, rel)}
+                          canEdit={canEdit}
+                          sync={sync}
+                          onNav={onNav}
+                          onBulkStatus={requestBulkStatus}
+                          onCostChange={onCostChange}
+                          onCostRetry={retryCost}
+                        />
+                      );
+                    })}
+                  </div>
+                  {releases.length > visibleBatches ? (
+                    <div className="flex justify-center mt-5">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleBatches((n) => n + BATCHES_PER_PAGE)}
+                        className="rounded-xl bg-secondary border border-border text-foreground text-xs px-4 py-2.5 font-bold"
+                      >
+                        Show more batches ({releases.length - visibleBatches} more)
+                      </button>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <div className="rounded-[20px] border border-border bg-card p-10 text-center text-sm text-muted-foreground">
                   No batches yet.
                 </div>
               )}
             </>
+          ) : view.page === "activity" ? (
+            <ActivityPage />
+          ) : view.page === "access" ? (
+            <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
           ) : (
             <BatchPage
               rel={view.batch}
@@ -572,6 +628,7 @@ export function Dashboard({ user }) {
               onCostRetry={retryCost}
               onBulkStatus={requestBulkStatus}
               onAddNote={onAddNote}
+              onRenameCollection={onRenameCollection}
             />
           )}
         </main>

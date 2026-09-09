@@ -1,4 +1,4 @@
-import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, Folder, ChevronRight } from "lucide-react";
+import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, Folder, ChevronRight, Check } from "lucide-react";
 import { fmt, shortRelease, MILESTONE_TARGET, RELEASE_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 import { MascotRider } from "@/components/mascot";
@@ -142,7 +142,12 @@ export function BatchCard({ rel, rr, colCount, noteCount, cost, canEdit, sync, o
         </span>
       ) : null}
       <div className="flex items-start gap-4 mb-4">
-        <Ring pct={pct} size={60} />
+        <Ring
+          pct={pct}
+          size={60}
+          color={complete ? "var(--good)" : undefined}
+          label={complete ? <Check className="size-5" style={{ color: "var(--good)" }} /> : undefined}
+        />
         <div className="min-w-0">
           <h3 className="f-heading font-bold text-lg leading-tight truncate text-foreground">{rel}</h3>
           <p className="text-xs mt-0.5 text-muted-foreground">

@@ -1,4 +1,4 @@
-import { Folder } from "lucide-react";
+import { Folder, Check } from "lucide-react";
 import { RELEASE_LINKS, COLLECTION_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 import { BulkStatusControl } from "./status-select";
@@ -21,6 +21,7 @@ export function BatchPage({
   onCostRetry,
   onBulkStatus,
   onAddNote,
+  onRenameCollection,
 }) {
   if (!rows.length) {
     return (
@@ -34,6 +35,7 @@ export function BatchPage({
   }
   const delivered = rows.filter((r) => r.status === "Delivered").length;
   const pct = rows.length ? (delivered / rows.length) * 100 : 0;
+  const complete = rows.length > 0 && delivered === rows.length;
   const relLink = RELEASE_LINKS[rel];
   const colKeys = Object.keys(collections);
 
@@ -41,7 +43,12 @@ export function BatchPage({
     <>
       <div className="rounded-[20px] border border-border bg-card p-5 mb-5 rise">
         <div className="flex items-start gap-4 flex-wrap">
-          <Ring pct={pct} size={60} />
+          <Ring
+            pct={pct}
+            size={60}
+            color={complete ? "var(--good)" : undefined}
+            label={complete ? <Check className="size-5" style={{ color: "var(--good)" }} /> : undefined}
+          />
           <div className="flex-1 min-w-[180px]">
             <p className="text-xs text-muted-foreground">
               {colKeys.length} collections · {rows.length} dresses · {delivered} delivered
@@ -115,6 +122,7 @@ export function BatchPage({
             onCostChange={onCostChange}
             onCostRetry={onCostRetry}
             onBulkStatus={onBulkStatus}
+            onRenameCollection={onRenameCollection}
           />
         );
       })}

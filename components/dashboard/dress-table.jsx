@@ -1,8 +1,10 @@
-import { Coins, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { Coins, ExternalLink, Pencil, Check, X } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SyncDot } from "@/components/ui/sync-dot";
+import { NumberStepper } from "@/components/ui/stepper";
 import { StatusSelect, BulkStatusControl } from "./status-select";
 
 export function CostInput({ scope, keyName, value, syncState, disabled, onChange, onRetry }) {
@@ -68,6 +70,13 @@ export function DressRow({ row, disabled, syncState, onFieldChange, onRetry }) {
           className="rounded-[10px] border border-border bg-secondary/60 f-mono text-xs px-2 py-1.5 w-16 outline-none focus-visible:border-primary disabled:opacity-60"
         />
       </td>
+      <td className="py-3 px-4">
+        <NumberStepper
+          value={row.revisions != null ? row.revisions : 1}
+          disabled={disabled}
+          onChange={(n) => onFieldChange(row.id, "revisions", n)}
+        />
+      </td>
     </tr>
   );
 }
@@ -87,8 +96,38 @@ export function CollectionCard({
   onCostChange,
   onCostRetry,
   onBulkStatus,
+  onRenameCollection,
 }) {
   const delivered = colRows.filter((r) => r.status === "Delivered").length;
+  const [renaming, setRenaming] = useState(false);
+  const [draft, setDraft] = useState(col);
+  const [saving, setSaving] = useState(false);
+
+  const startRename = (e) => {
+    e.stopPropagation();
+    setDraft(col);
+    setRenaming(true);
+  };
+  const cancelRename = (e) => {
+    e?.stopPropagation();
+    setRenaming(false);
+  };
+  const submitRename = async (e) => {
+    e?.stopPropagation();
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === col) {
+      setRenaming(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onRenameCollection(rel, col, trimmed);
+      setRenaming(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="rounded-[20px] border border-border bg-card mb-3 overflow-hidden rise">
       <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 flex-wrap bg-secondary/40">
@@ -106,7 +145,56 @@ export function CollectionCard({
           </span>
         </button>
         <div className="min-w-0">
-          <h3 className="font-bold text-sm truncate text-foreground">{col}</h3>
+          {renaming ? (
+            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+              <input
+                autoFocus
+                type="text"
+                value={draft}
+                disabled={saving}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitRename(e);
+                  if (e.key === "Escape") cancelRename(e);
+                }}
+                className="rounded-lg border border-primary bg-card px-2 py-1 text-sm font-bold text-foreground outline-none w-40"
+              />
+              <button
+                type="button"
+                onClick={submitRename}
+                disabled={saving}
+                className="size-6 rounded-md flex items-center justify-center text-good disabled:opacity-50"
+                style={{ color: "var(--good)" }}
+                aria-label="Save name"
+              >
+                <Check className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={cancelRename}
+                disabled={saving}
+                className="size-6 rounded-md flex items-center justify-center text-muted-foreground disabled:opacity-50"
+                aria-label="Cancel rename"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-bold text-sm truncate text-foreground">{col}</h3>
+              {canEdit ? (
+                <button
+                  type="button"
+                  onClick={startRename}
+                  className="text-muted-foreground hover:text-foreground shrink-0"
+                  title="Rename this collection"
+                  aria-label="Rename this collection"
+                >
+                  <Pencil className="size-3" />
+                </button>
+              ) : null}
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground">
             {colRows.length} dress{colRows.length === 1 ? "" : "es"} · {delivered} delivered
           </p>
@@ -134,7 +222,7 @@ export function CollectionCard({
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {["Dress", "Status", "Files", "Comments", "Credits"].map((h) => (
+                {["Dress", "Status", "Files", "Comments", "Credits", "Revisions"].map((h) => (
                   <th key={h} className="text-left text-[10.5px] font-bold uppercase tracking-wide px-4 py-2 text-muted-foreground">
                     {h}
                   </th>

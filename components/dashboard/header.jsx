@@ -5,6 +5,11 @@ import { Search, Sun, Moon, ArrowLeft, LogOut, FileSpreadsheet } from "lucide-re
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
+const PAGE_TITLES = {
+  activity: ["Activity", "Who changed what, tracked in real time"],
+  access: ["Access & roles", "Manage who can view, edit, or manage this board"],
+};
+
 export function Crumb({ view, onBack }) {
   if (view.page === "overview") {
     return (
@@ -15,6 +20,22 @@ export function Crumb({ view, onBack }) {
         <p className="text-sm mt-0.5 text-muted-foreground">
           Khaadi × ImagineArt PDP shoot — every batch, tracked live
         </p>
+      </div>
+    );
+  }
+  if (PAGE_TITLES[view.page]) {
+    const [title, sub] = PAGE_TITLES[view.page];
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold mb-1 text-primary"
+        >
+          <ArrowLeft className="size-4" /> All batches
+        </button>
+        <h1 className="f-heading font-extrabold text-2xl sm:text-[28px] leading-tight text-foreground">{title}</h1>
+        <p className="text-sm mt-0.5 text-muted-foreground">{sub}</p>
       </div>
     );
   }

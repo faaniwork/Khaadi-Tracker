@@ -2,14 +2,16 @@ import { LayoutGrid } from "lucide-react";
 import { shortRelease } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 
-function NavRing({ id, active, pct }) {
-  return id === "overview" ? (
-    <div className="ring-chart" style={{ width: 44, height: 44, background: "var(--secondary)" }}>
-      <LayoutGrid className="size-4 text-foreground" />
-    </div>
-  ) : (
-    <Ring pct={pct} size={44} label={Math.round(pct) + ""} />
-  );
+function NavRing({ id, active, pct, icon: Icon }) {
+  if (id === "overview" || Icon) {
+    const DisplayIcon = Icon || LayoutGrid;
+    return (
+      <div className="ring-chart" style={{ width: 44, height: 44, background: "var(--secondary)" }}>
+        <DisplayIcon className="size-4 text-foreground" />
+      </div>
+    );
+  }
+  return <Ring pct={pct} size={44} label={Math.round(pct) + ""} />;
 }
 
 export function Sidebar({ items, active, onNav }) {
@@ -32,7 +34,7 @@ export function Sidebar({ items, active, onNav }) {
               title={it.label}
               className="flex flex-col items-center gap-1 py-2 w-full rounded-xl transition-transform hover:-translate-y-px"
             >
-              <NavRing id={it.id} active={isActive} pct={it.pct} />
+              <NavRing id={it.id} active={isActive} pct={it.pct} icon={it.icon} />
               <span
                 className={`f-mono text-[9.5px] font-bold uppercase tracking-wide ${
                   isActive ? "text-foreground" : "text-muted-foreground"
@@ -62,7 +64,7 @@ export function MobileNav({ items, active, onNav }) {
               isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground border border-border"
             }`}
           >
-            {it.id === "overview" ? "All batches" : shortRelease(it.id)}
+            {it.id === "overview" ? "All batches" : it.icon ? it.label : shortRelease(it.id)}
           </button>
         );
       })}

@@ -13,6 +13,7 @@ const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS || '')
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [Google],
+  trustHost: true,
   callbacks: {
     async signIn({ profile }) {
       if (!allowedDomains.length) return true;
