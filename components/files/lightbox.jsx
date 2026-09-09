@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { driveThumbUrl } from "@/lib/api";
 
@@ -42,7 +43,12 @@ export function Lightbox({ files, dressId, index, onClose, onIndexChange }) {
 
   if (!file) return null;
 
-  return (
+  // Portalled straight onto <body>. Rendered inline it would sit inside the
+  // dress card's `rise` entrance animation, and an animated transform on an
+  // ancestor — even one that settles on translateY(0) — creates a containing
+  // block for `position: fixed`, which would trap this at the card's size
+  // instead of covering the screen.
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center select-none"
       role="dialog"
@@ -110,6 +116,7 @@ export function Lightbox({ files, dressId, index, onClose, onIndexChange }) {
       <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/70 f-mono">
         {file.name} · {index + 1} / {images.length}
       </p>
-    </div>
+    </div>,
+    document.body
   );
 }
