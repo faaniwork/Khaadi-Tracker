@@ -6,6 +6,7 @@ import { sortReleasesByRecency, STATUS_OPTIONS } from "@/lib/constants";
 import { Select } from "@/components/ui/input";
 import { driveList, driveThumbUrl } from "@/lib/api";
 import { DressFiles } from "./files";
+import { DownloadMenu } from "@/components/files/download-menu";
 
 function sortedReleases(rows) {
   const set = [...new Set(rows.map((r) => r.release || "Unsorted"))];
@@ -186,8 +187,11 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
             <span className="text-sm font-bold text-foreground">{dress.dress}</span>
           </>
         ) : null}
+        {!dress && release ? (
+          <DownloadMenu dresses={collection ? collectionRows : releaseRows} showToast={showToast} className="ml-auto" />
+        ) : null}
         {!dress ? (
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="ml-auto text-xs">
+          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={release ? "text-xs" : "ml-auto text-xs"}>
             <option value="">All statuses</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>

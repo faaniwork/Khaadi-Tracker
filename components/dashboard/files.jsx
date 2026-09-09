@@ -18,6 +18,7 @@ import { RejectDialog } from "@/components/files/reject-dialog";
 import { Dropzone } from "@/components/files/dropzone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Lightbox } from "@/components/files/lightbox";
+import { DownloadMenu } from "@/components/files/download-menu";
 
 const STATUS_FILTERS = [
   { value: "", label: "All" },
@@ -267,6 +268,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <DownloadMenu dresses={[dress]} showToast={showToast} />
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-xs">
             {STATUS_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>
