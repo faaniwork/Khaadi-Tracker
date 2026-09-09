@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { initResumableUpload, isWithinDress } from '@/lib/drive';
+import { getUserDriveAccessToken } from '@/lib/googleUserToken';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 async function resolveTargetFolder(dressFolderId, folderId) {
@@ -44,7 +45,19 @@ export async function POST(req) {
     // too, or Drive won't allow that PUT through. See the comment in
     // initResumableUpload for why.
     const origin = req.headers.get('origin') || new URL(req.url).origin;
-    const uploadUrl = await initResumableUpload({ folderId: target, name, mimeType, origin });
+    // Created with the signed-in person's OWN Google credentials, so the file
+    // they upload is owned by them. The service account cannot own a file at
+    // all — Drive answers "Service Accounts do not have storage quota" — so
+    // this is the only way an upload can land in the shoot folders. Which
+    // folder it may land in is still decided above, by us, not by them.
+    const accessToken = await getUserDriveAccessToken();
+    const uploadUrl = await initResumableUpload({
+      folderId: target,
+      name,
+      mimeType,
+      origin,
+      accessToken,
+    });
 
     return NextResponse.json({ uploadUrl });
   } catch (e) {
