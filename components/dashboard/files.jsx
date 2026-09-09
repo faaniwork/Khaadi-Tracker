@@ -113,6 +113,8 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const onFiles = async (files) => {
     setUpload({ active: true, progress: 0 });
     let done = 0;
+    let failed = 0;
+    let lastError = "";
     for (const file of files) {
       try {
         await driveUpload({
@@ -122,13 +124,25 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           onProgress: (p) => setUpload({ active: true, progress: (done + p) / files.length }),
         });
       } catch (e) {
-        showToast?.(e.message || `Could not upload ${file.name}`, "error");
+        failed += 1;
+        lastError = e.message || `Could not upload ${file.name}`;
       }
       done += 1;
       setUpload({ active: true, progress: done / files.length });
     }
     setUpload({ active: false, progress: 0 });
-    showToast?.(`Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`, "ok");
+    // One toast at the end reflecting what actually happened, not what was
+    // attempted — this used to announce "Uploaded N files" unconditionally
+    // even when every single one had thrown, which is exactly how a real
+    // upload failure looked identical to success from here.
+    const ok = files.length - failed;
+    if (!ok) {
+      showToast?.(lastError || "Upload failed", "error");
+    } else if (failed) {
+      showToast?.(`Uploaded ${ok} of ${files.length} — ${failed} failed: ${lastError}`, "error");
+    } else {
+      showToast?.(`Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`, "ok");
+    }
     load(currentFolder);
   };
 
