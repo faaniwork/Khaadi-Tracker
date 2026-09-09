@@ -38,7 +38,13 @@ export async function POST(req) {
     const dress = await assertDressInScope(caller, dressId);
     const target = await resolveTargetFolder(dress.id, folderId);
 
-    const uploadUrl = await initResumableUpload({ folderId: target, name, mimeType });
+    // The browser's own follow-up PUT (see driveUpload in lib/api.js) will
+    // carry this same Origin automatically since it's a cross-origin
+    // request to Google's servers — the session has to be created with it
+    // too, or Drive won't allow that PUT through. See the comment in
+    // initResumableUpload for why.
+    const origin = req.headers.get('origin') || new URL(req.url).origin;
+    const uploadUrl = await initResumableUpload({ folderId: target, name, mimeType, origin });
 
     return NextResponse.json({ uploadUrl });
   } catch (e) {
