@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { trashFile } from '@/lib/drive';
+import { trashFile, assertFileInDress } from '@/lib/drive';
 import { recordLog } from '@/lib/db';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
@@ -25,6 +25,9 @@ export async function DELETE(req) {
     }
 
     const dress = await assertDressInScope(caller, dressId);
+    // The file has to actually be in this dress, and has to be a file: a
+    // folder id here would trash a whole dress or collection.
+    await assertFileInDress({ fileId, dressFolderId: dress.id });
     const trashed = await trashFile(fileId);
 
     await recordLog({

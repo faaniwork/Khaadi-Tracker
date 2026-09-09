@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream';
-import { fetchPreviewBytes } from '@/lib/drive';
+import { fetchPreviewBytes, assertFileInDress } from '@/lib/drive';
 import { resolveCaller, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 /**
@@ -10,12 +10,11 @@ import { resolveCaller, assertDressInScope, statusForError } from '@/lib/reviewA
  * short-lived and only resolve for a caller Google considers authorized, and
  * our viewers are authorized to this app, not to the file.
  *
- * `dressId` is required so a review token's request can be checked against
- * the batch it was issued for. The file's parentage is not re-verified on
- * every thumbnail, which would cost an extra Drive round trip per image in
- * the grid; a Drive file id is 44 characters of unguessable identifier, so
- * holding a valid token for one batch gives no practical way to name a file
- * in another.
+ * `dressId` is checked against the caller's batch, AND the file is checked to
+ * be inside that dress. The parentage check is free: `parents` comes back in
+ * the same Drive call that yields the thumbnail link, so it costs no extra
+ * round trip. Without it, any file the service account could read was
+ * retrievable by anyone holding a token for any batch.
  */
 export async function GET(req) {
   try {
@@ -28,7 +27,11 @@ export async function GET(req) {
       return new Response('fileId and dressId are required', { status: 400 });
     }
 
-    await assertDressInScope(caller, dressId);
+    const dress = await assertDressInScope(caller, dressId);
+    // Shares the containment check with every other file route, so previews
+    // and actions can never disagree about what is inside a dress. It also
+    // allows subfolders, which a flat parent comparison did not.
+    await assertFileInDress({ fileId, dressFolderId: dress.id });
 
     const { body, contentType } = await fetchPreviewBytes(fileId);
     const webStream = typeof body?.getReader === 'function' ? body : Readable.toWeb(body);

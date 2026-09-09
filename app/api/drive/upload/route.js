@@ -1,11 +1,29 @@
 import { NextResponse } from 'next/server';
-import { uploadFile } from '@/lib/drive';
+import { uploadFile, isWithinDress } from '@/lib/drive';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 // Vercel's serverless request body cap is what limits this in practice.
 // Rejecting oversized files here gives a clear message instead of a platform
 // level 413 with no explanation.
 const MAX_BYTES = 40 * 1024 * 1024;
+
+/**
+ * Keeps the upload target inside the named dress, at any depth. Without
+ * this, a `folderId` of the caller's choosing meant an editor could write
+ * into any folder the service account can reach, anywhere in Drive.
+ */
+async function resolveTargetFolder(dressFolderId, folderId) {
+  if (!folderId || typeof folderId !== 'string' || folderId === dressFolderId) {
+    return dressFolderId;
+  }
+  if (!(await isWithinDress({ folderId, dressFolderId }))) {
+    const err = new Error('NOT_FOUND: That folder is not inside this dress.');
+    err.code = 'NOT_FOUND';
+    err.status = 404;
+    throw err;
+  }
+  return folderId;
+}
 
 /**
  * POST /api/drive/upload   multipart/form-data: dressId, folderId?, file
@@ -40,7 +58,7 @@ export async function POST(req) {
     }
 
     const dress = await assertDressInScope(caller, dressId);
-    const target = folderId && typeof folderId === 'string' ? folderId : dress.id;
+    const target = await resolveTargetFolder(dress.id, folderId);
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const created = await uploadFile({

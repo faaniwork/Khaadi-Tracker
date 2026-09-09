@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createFolder } from '@/lib/drive';
+import { createFolder, isWithinDress } from '@/lib/drive';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 /**
@@ -20,7 +20,19 @@ export async function POST(req) {
     }
 
     const dress = await assertDressInScope(caller, dressId);
-    const folder = await createFolder({ parentId: parentId || dress.id, name });
+    // Same containment as uploads: the parent has to be inside this dress,
+    // at any depth, never an arbitrary id.
+    let parent = dress.id;
+    if (parentId && parentId !== dress.id) {
+      if (!(await isWithinDress({ folderId: parentId, dressFolderId: dress.id }))) {
+        return NextResponse.json(
+          { error: 'That folder is not inside this dress.' },
+          { status: 404 }
+        );
+      }
+      parent = parentId;
+    }
+    const folder = await createFolder({ parentId: parent, name });
 
     return NextResponse.json({ folder });
   } catch (e) {

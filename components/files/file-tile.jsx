@@ -26,7 +26,6 @@ export function FileTile({
   file,
   dressId,
   review,
-  token,
   canWrite,
   canReview,
   busy,
@@ -69,7 +68,7 @@ export function FileTile({
         {file.isImage && !imgFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={driveThumbUrl({ fileId: file.id, dressId, token })}
+            src={driveThumbUrl({ fileId: file.id, dressId })}
             alt={file.name}
             loading="lazy"
             onError={() => setImgFailed(true)}

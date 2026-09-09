@@ -1,27 +1,35 @@
 import { NextResponse } from 'next/server';
-import { moveToRejected, moveOutOfRejected } from '@/lib/drive';
-import { setFileReview, getReviewsForDress } from '@/lib/db';
+import { moveToRejected, moveOutOfRejected, assertFileInDress } from '@/lib/drive';
+import { setFileReview, getFileReview, validateReviewDecision } from '@/lib/db';
 import { resolveCaller, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 const DECISIONS = ['approved', 'rejected', 'pending'];
 
 /**
  * POST /api/drive/review
- *   { dressId, fileId, fileName?, decision, reason?, feedbackText? }
+ *   { dressId, fileId, decision, reason?, feedbackText? }
  *
  * Open to clients holding a review link for this batch, and to signed-in
  * editors and admins recording a decision themselves. Signed-in viewers
  * cannot review, for the same reason they cannot edit the board.
  *
- * A rejection moves the file into a "Rejected" subfolder of the dress folder,
- * created on first use. Changing a decision back to approved moves it out
- * again, so an image never stays stranded somewhere nobody looks.
+ * ORDER OF OPERATIONS, which matters more than it looks:
  *
- * The Drive move happens BEFORE the row is written. If the write then fails,
- * the file has moved but still reads as pending, and simply repeating the
- * action fixes it: both moves are idempotent. The reverse order would leave a
- * file marked rejected that is still sitting in the main folder, which is the
- * version of this that wastes someone's afternoon.
+ *   1. authorise the caller
+ *   2. check the DRESS is in their batch
+ *   3. check the FILE is really inside that dress, and is a file not a folder
+ *   4. validate the decision itself
+ *   5. only now touch Drive
+ *   6. write the row, which also writes the audit entry
+ *
+ * Steps 3 and 4 both used to happen after the Drive move. That let a caller
+ * re-parent any object the service account could see by pairing a dress they
+ * were allowed to touch with a file id they were not, and a deliberately
+ * invalid decision made the whole thing fail after the move, leaving no audit
+ * entry behind. Everything is now checked before anything moves.
+ *
+ * `fileName` is taken from Drive, never from the request body, so it cannot
+ * be used to write arbitrary text into the activity log.
  */
 export async function POST(req) {
   try {
@@ -33,7 +41,7 @@ export async function POST(req) {
       );
     }
 
-    const { dressId, fileId, fileName, decision, reason, feedbackText } = await req.json();
+    const { dressId, fileId, decision, reason, feedbackText } = await req.json();
     if (!dressId || !fileId) {
       return NextResponse.json({ error: 'dressId and fileId are required' }, { status: 400 });
     }
@@ -42,9 +50,16 @@ export async function POST(req) {
     }
 
     const dress = await assertDressInScope(caller, dressId);
+    const { file } = await assertFileInDress({ fileId, dressFolderId: dress.id });
 
-    const existing = await getReviewsForDress(dress.id);
-    const previous = existing[fileId]?.status || 'pending';
+    // Throws before anything in Drive is touched.
+    const validated = validateReviewDecision({ status: decision, reason, text: feedbackText });
+
+    // Keyed on the FILE, not the dress. A row can legitimately name a
+    // different dress if an editor moved the image in Drive, and reading it
+    // per-dress would report "pending" and skip the move back out of
+    // Rejected, leaving the file somewhere nobody looks.
+    const previous = (await getFileReview(fileId))?.status || 'pending';
 
     let moved = null;
     if (decision === 'rejected') {
@@ -57,10 +72,10 @@ export async function POST(req) {
       fileId,
       dressId: dress.id,
       release: dress.release,
-      fileName,
+      fileName: file.name,
       status: decision,
-      reason,
-      text: feedbackText,
+      reason: validated.reason,
+      text: validated.text,
       by: caller.by,
     });
 

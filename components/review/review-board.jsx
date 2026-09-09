@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Check, RefreshCw } from "lucide-react";
-import { fetchReviewBatch, driveReview } from "@/lib/api";
+import { fetchReviewBatch, driveReview, startReviewSession } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/ui/logo";
@@ -50,9 +50,13 @@ export function ReviewBoard({ token, release, label }) {
 
   // State is written only from then/catch, never synchronously in the effect
   // body below.
+  // The cookie is established first, because the thumbnails that render
+  // straight after are <img> requests that can only authenticate that way.
   const fetchInto = useCallback(
     (reviewerName, isStale) =>
-      fetchReviewBatch({ token, reviewerName })
+      startReviewSession({ token })
+        .catch(() => {})
+        .then(() => fetchReviewBatch({ token, reviewerName }))
         .then((res) => {
           if (isStale?.()) return;
           setData(res);
@@ -255,7 +259,6 @@ export function ReviewBoard({ token, release, label }) {
                     key={f.id}
                     file={f}
                     dressId={d.id}
-                    token={token}
                     review={data.reviews[f.id]}
                     canWrite={false}
                     canReview
