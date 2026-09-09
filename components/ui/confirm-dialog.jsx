@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./button";
 
 export function ConfirmDialog({ open, title, description, confirmLabel = "Confirm", onConfirm, onCancel }) {
@@ -18,7 +19,10 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
 
   if (!open) return null;
 
-  return (
+  // Portalled onto <body> — see the same note in feedback-dialog.jsx: this
+  // would otherwise be trapped inside whatever `rise`-animated card renders
+  // it, instead of centering on the actual viewport.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="presentation"
@@ -53,6 +57,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

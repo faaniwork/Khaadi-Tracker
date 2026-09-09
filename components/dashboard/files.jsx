@@ -15,7 +15,6 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/input";
 import { FileTile } from "@/components/files/file-tile";
 import { RejectDialog } from "@/components/files/reject-dialog";
-import { FeedbackDialog } from "@/components/files/feedback-dialog";
 import { Dropzone } from "@/components/files/dropzone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Lightbox } from "@/components/files/lightbox";
@@ -24,7 +23,7 @@ const STATUS_FILTERS = [
   { value: "", label: "All" },
   { value: "pending", label: "Pending" },
   { value: "approved", label: "Approved" },
-  { value: "feedback", label: "Feedback" },
+  { value: "commented", label: "Has comments" },
   { value: "rejected", label: "Rejected" },
 ];
 
@@ -49,9 +48,6 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const [rejecting, setRejecting] = useState(null);
   const [rejectError, setRejectError] = useState("");
   const [savingReject, setSavingReject] = useState(false);
-  const [feedbacking, setFeedbacking] = useState(null);
-  const [feedbackError, setFeedbackError] = useState("");
-  const [savingFeedback, setSavingFeedback] = useState(false);
   const [confirmTrash, setConfirmTrash] = useState(null);
   const [newFolder, setNewFolder] = useState("");
   const [creating, setCreating] = useState(false);
@@ -188,29 +184,6 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     }
   };
 
-  const submitFeedback = async ({ text }) => {
-    const file = feedbacking;
-    setSavingFeedback(true);
-    setFeedbackError("");
-    try {
-      const res = await driveReview({
-        dressId: dress.id,
-        fileId: file.id,
-        fileName: file.name,
-        decision: "feedback",
-        feedbackText: text,
-      });
-      setReviewLocal(file.id, res.review);
-      if (res.comment) addCommentLocal(file.id, res.comment);
-      setFeedbacking(null);
-      if (res.moved) load(currentFolder);
-    } catch (e) {
-      setFeedbackError(e.message || "Could not save that");
-    } finally {
-      setSavingFeedback(false);
-    }
-  };
-
   const addComment = async (file, text) => {
     setPostingCommentIds((prev) => new Set(prev).add(file.id));
     try {
@@ -260,16 +233,19 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const counts = Object.values(state.reviews).reduce(
     (acc, r) => {
       if (r.status === "approved") acc.approved++;
-      else if (r.status === "feedback") acc.feedback++;
       else if (r.status === "rejected") acc.rejected++;
       return acc;
     },
-    { approved: 0, feedback: 0, rejected: 0 }
+    { approved: 0, rejected: 0 }
   );
+  const commentedCount = Object.values(state.comments).filter((c) => c.length).length;
 
-  const visibleFiles = statusFilter
-    ? state.files.filter((f) => f.isFolder || (state.reviews[f.id]?.status || "pending") === statusFilter)
-    : state.files;
+  const matchesFilter = (f) => {
+    if (!statusFilter) return true;
+    if (statusFilter === "commented") return (state.comments[f.id] || []).length > 0;
+    return (state.reviews[f.id]?.status || "pending") === statusFilter;
+  };
+  const visibleFiles = state.files.filter((f) => f.isFolder || matchesFilter(f));
 
   return (
     <div className="rounded-[20px] border border-border bg-card p-5 mb-5 rise">
@@ -286,7 +262,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
             {dress.collection} · {state.files.filter((f) => !f.isFolder).length} file
             {state.files.filter((f) => !f.isFolder).length === 1 ? "" : "s"}
             {counts.approved ? ` · ${counts.approved} approved` : ""}
-            {counts.feedback ? ` · ${counts.feedback} feedback` : ""}
+            {commentedCount ? ` · ${commentedCount} commented` : ""}
             {counts.rejected ? ` · ${counts.rejected} rejected` : ""}
           </p>
         </div>
@@ -370,10 +346,6 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
                 setLightboxIndex(images.findIndex((x) => x.id === f.id));
               }}
               onApprove={onApprove}
-              onFeedback={(file) => {
-                setFeedbackError("");
-                setFeedbacking(file);
-              }}
               onReject={(file) => {
                 setRejectError("");
                 setRejecting(file);
@@ -393,15 +365,6 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         error={rejectError}
         onSubmit={submitReject}
         onCancel={() => setRejecting(null)}
-      />
-      <FeedbackDialog
-        key={feedbacking?.id || "none-feedback"}
-        open={Boolean(feedbacking)}
-        fileName={feedbacking?.name || ""}
-        saving={savingFeedback}
-        error={feedbackError}
-        onSubmit={submitFeedback}
-        onCancel={() => setFeedbacking(null)}
       />
       <ConfirmDialog
         open={Boolean(confirmTrash)}
@@ -424,10 +387,6 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           onClose={() => setLightboxIndex(null)}
           onIndexChange={setLightboxIndex}
           onApprove={onApprove}
-          onFeedback={(file) => {
-            setFeedbackError("");
-            setFeedbacking(file);
-          }}
           onReject={(file) => {
             setRejectError("");
             setRejecting(file);

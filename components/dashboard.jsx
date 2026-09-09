@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Images, Sun, Moon, LogOut } from "lucide-react";
+import { Activity, ShieldCheck, Sun, Moon, LogOut } from "lucide-react";
 import { moodFor, mascotMessage, FUN_MESSAGES, sortReleasesByRecency } from "@/lib/constants";
 import {
   fetchBoard,
@@ -558,7 +558,6 @@ export function Dashboard({ user }) {
         return { id: r, label: r, pct: s.pct, discarded: s.allDiscarded };
       }),
       { id: "activity", label: "Activity", icon: Activity },
-      { id: "outputs", label: "Outputs", icon: Images },
     ];
     if (role === "admin") items.push({ id: "access", label: "Access", icon: ShieldCheck });
     return items;
@@ -618,7 +617,7 @@ export function Dashboard({ user }) {
           </div>
         </header>
         <main className="p-4 sm:p-6">
-          <OutputView rows={rows} showToast={showToast} />
+          <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
         </main>
         <Toast {...toast} />
       </div>
@@ -635,6 +634,7 @@ export function Dashboard({ user }) {
         <MobileNav items={navItems} active={{ id: activeNavId }} onNav={onNav} />
         <Header
           view={view}
+          onNav={onNav}
           onBack={() => onNav("overview")}
           live={live}
           role={role}
@@ -714,7 +714,7 @@ export function Dashboard({ user }) {
           ) : view.page === "access" ? (
             <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
           ) : view.page === "outputs" ? (
-            <OutputView rows={rows} showToast={showToast} />
+            <OutputView rows={rows} showToast={showToast} canWrite={canEdit} />
           ) : (
             <BatchPage
               rel={view.batch}

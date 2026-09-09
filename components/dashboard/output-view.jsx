@@ -1,10 +1,93 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronRight, Layers, Shirt, Images } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, ImageOff } from "lucide-react";
 import { sortReleasesByRecency, STATUS_OPTIONS } from "@/lib/constants";
 import { Select } from "@/components/ui/input";
+import { driveList, driveThumbUrl } from "@/lib/api";
 import { DressFiles } from "./files";
+
+function sortedReleases(rows) {
+  const set = [...new Set(rows.map((r) => r.release || "Unsorted"))];
+  return sortReleasesByRecency(set);
+}
+
+/**
+ * A dress's own first image, standing in for the whole batch/collection/
+ * dress it represents. One real photo says more at a glance than an icon in
+ * a tinted circle ever could, and it is why every tile here looks like a
+ * cover, not a list row with a label.
+ */
+function CoverThumb({ dressId, className }) {
+  const [fileId, setFileId] = useState(undefined); // undefined = loading, null = none found
+  useEffect(() => {
+    let ignore = false;
+    if (!dressId) return;
+    driveList({ dressId })
+      .then((data) => {
+        if (ignore) return;
+        const first = (data.files || []).find((f) => !f.isFolder && f.isImage);
+        setFileId(first ? first.id : null);
+      })
+      .catch(() => {
+        if (!ignore) setFileId(null);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [dressId]);
+
+  if (fileId) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={driveThumbUrl({ fileId, dressId, size: 400 })} alt="" className={className} />
+    );
+  }
+  return (
+    <div className={`${className} bg-secondary grid place-items-center`}>
+      {fileId === null ? (
+        <ImageOff className="size-6 text-muted-foreground/50" />
+      ) : (
+        <div className="size-6 rounded-full border-2 border-muted-foreground/20 border-t-primary animate-spin" />
+      )}
+    </div>
+  );
+}
+
+/**
+ * One browsable tile: a photo filling the frame, its name and a stat line
+ * sitting in a gradient at the bottom. The same shape at every level (batch,
+ * collection, dress) rather than an icon-in-a-box list row — the picture
+ * carries the content, the chrome stays out of the way.
+ */
+function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-2xl text-left hover:-translate-y-0.5 transition-transform duration-200 ${
+        wide ? "aspect-[16/10]" : "aspect-[4/5]"
+      }`}
+    >
+      <CoverThumb dressId={coverDressId} className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+      {badge ? (
+        <span
+          className="absolute top-3 left-3 f-mono text-[10px] font-bold px-2.5 py-1 rounded-full"
+          style={{ background: "var(--good)", color: "var(--good-foreground)" }}
+        >
+          {badge}
+        </span>
+      ) : null}
+      <div className="absolute inset-x-0 bottom-0 p-4">
+        <p className="font-bold text-white text-base leading-snug truncate" style={{ textShadow: "0 1px 3px rgba(0,0,0,.5)" }}>
+          {title}
+        </p>
+        <p className="text-xs text-white/80 mt-0.5">{subtitle}</p>
+      </div>
+    </button>
+  );
+}
 
 /**
  * The client-facing side of the board: batches → collections → dresses →
@@ -13,11 +96,18 @@ import { DressFiles } from "./files";
  *
  * Opening a dress goes straight to its images. There is no extra "click to
  * see 24 files" step in between; DressFiles is rendered already expanded.
- * Review (approve/reject) is on; upload, trash and folder management are
- * not — that stays inside the team's own dashboard.
+ * `canWrite` is passed straight through to it — a client only ever gets
+ * `false` (review only), an admin or editor gets the same upload/trash/
+ * folder access here as inside their own dashboard, so nobody has to leave
+ * this view to manage a file.
+ *
+ * `autoLatest` skips the batch-picker screen entirely and lands straight in
+ * the most recent release's collections — for a client, that is the only
+ * batch that matters most weeks, and making them pick it out of a list every
+ * time was exactly the extra click this view exists to remove.
  */
-export function OutputView({ rows, showToast }) {
-  const [release, setRelease] = useState(null);
+export function OutputView({ rows, showToast, canWrite = false, autoLatest = false }) {
+  const [release, setRelease] = useState(() => (autoLatest ? sortedReleases(rows)[0] || null : null));
   const [collection, setCollection] = useState(null);
   const [dress, setDress] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
@@ -111,89 +201,59 @@ export function OutputView({ rows, showToast }) {
       {dress ? (
         <DressFiles
           dress={dress}
-          canWrite={false}
+          canWrite={canWrite}
           canReview={true}
           showToast={showToast}
           onClose={() => setDress(null)}
         />
       ) : collection ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {collectionRows.map((r) => {
-            const delivered = r.status === "Delivered";
-            return (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => setDress(r)}
-                className="rounded-2xl border border-border bg-card p-5 flex flex-col items-center gap-2 text-center hover:border-primary hover:-translate-y-0.5 transition-all rise"
-              >
-                <div className="size-12 rounded-xl grid place-items-center bg-secondary">
-                  <Shirt className="size-5 text-muted-foreground" />
-                </div>
-                <p className="font-bold text-sm text-foreground truncate w-full">{r.dress}</p>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Images className="size-3" /> {r.files != null ? r.files : "—"} files
-                </p>
-                {delivered ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--good)", color: "var(--good-foreground)" }}>
-                    Delivered
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
+          {collectionRows.map((r) => (
+            <CoverTile
+              key={r.id}
+              coverDressId={r.id}
+              title={r.dress}
+              subtitle={`${r.files != null ? r.files : "—"} files`}
+              badge={r.status === "Delivered" ? "Delivered" : null}
+              onClick={() => setDress(r)}
+            />
+          ))}
           {!collectionRows.length ? (
             <p className="col-span-full text-center text-sm text-muted-foreground py-10">Nothing in this collection yet.</p>
           ) : null}
         </div>
       ) : release ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {Object.keys(collections).map((col) => {
             const colRows = collections[col];
             const delivered = colRows.filter((r) => r.status === "Delivered").length;
             return (
-              <button
+              <CoverTile
                 key={col}
-                type="button"
+                wide
+                coverDressId={colRows[0]?.id}
+                title={col}
+                subtitle={`${colRows.length} dress${colRows.length === 1 ? "" : "es"} · ${delivered} delivered`}
                 onClick={() => setCollection(col)}
-                className="rounded-2xl border border-border bg-card p-5 flex items-center gap-4 text-left hover:border-primary hover:-translate-y-0.5 transition-all rise"
-              >
-                <div className="size-12 rounded-xl grid place-items-center bg-secondary shrink-0">
-                  <Layers className="size-5 text-muted-foreground" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-sm text-foreground truncate">{col}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {colRows.length} dress{colRows.length === 1 ? "" : "es"} · {delivered} delivered
-                  </p>
-                </div>
-              </button>
+              />
             );
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {releases.map((rel) => {
             const rr = rows.filter((r) => (r.release || "Unsorted") === rel && matches(r));
             const delivered = rr.filter((r) => r.status === "Delivered").length;
             const cols = new Set(rr.map((r) => r.collection || "Unsorted")).size;
             return (
-              <button
+              <CoverTile
                 key={rel}
-                type="button"
+                wide
+                coverDressId={rr[0]?.id}
+                title={rel}
+                subtitle={`${cols} collection${cols === 1 ? "" : "s"} · ${rr.length} dresses · ${delivered} delivered`}
                 onClick={() => setRelease(rel)}
-                className="rounded-2xl border border-border bg-card p-5 flex items-center gap-4 text-left hover:border-primary hover:-translate-y-0.5 transition-all rise"
-              >
-                <div className="size-12 rounded-xl grid place-items-center bg-primary/15 shrink-0">
-                  <Layers className="size-5 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-sm text-foreground truncate">{rel}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {cols} collection{cols === 1 ? "" : "s"} · {rr.length} dresses · {delivered} delivered
-                  </p>
-                </div>
-              </button>
+              />
             );
           })}
           {!releases.length ? (

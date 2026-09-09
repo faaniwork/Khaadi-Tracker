@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 
 export const FEEDBACK_REASONS = [
@@ -43,7 +44,10 @@ export function RejectDialog({ open, fileName, saving, error, onSubmit, onCancel
   const needsText = reason === "other";
   const canSubmit = Boolean(reason) && (!needsText || text.trim().length > 0) && !saving;
 
-  return (
+  // Portalled onto <body> — see the same note in feedback-dialog.jsx: this
+  // would otherwise be trapped inside the dress card's animated `rise`
+  // wrapper instead of centering on the actual viewport.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
       <div
         className="absolute inset-0 bg-foreground/30 backdrop-blur-[2px]"
@@ -127,6 +131,7 @@ export function RejectDialog({ open, fileName, saving, error, onSubmit, onCancel
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

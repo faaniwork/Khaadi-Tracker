@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 const PAGE_TITLES = {
   activity: ["Activity", "Who changed what, tracked in real time"],
   access: ["Access & roles", "Manage who can view, edit, or manage this board"],
+  outputs: ["Outputs", "Batches, collections and dresses — the images, nothing else"],
 };
 
 export function Crumb({ view, onBack }) {
@@ -26,15 +27,20 @@ export function Crumb({ view, onBack }) {
   }
   if (PAGE_TITLES[view.page]) {
     const [title, sub] = PAGE_TITLES[view.page];
+    // Outputs is a sibling mode, not a page nested under the dashboard — the
+    // mode tabs above already do the job a "back" link would, so it does
+    // not get one.
     return (
       <div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold mb-1 text-primary"
-        >
-          <ArrowLeft className="size-4" /> All batches
-        </button>
+        {view.page !== "outputs" ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold mb-1 text-primary"
+          >
+            <ArrowLeft className="size-4" /> All batches
+          </button>
+        ) : null}
         <h1 className="f-heading font-extrabold text-2xl sm:text-[28px] leading-tight text-foreground">{title}</h1>
         <p className="text-sm mt-0.5 text-muted-foreground">{sub}</p>
       </div>
@@ -56,8 +62,39 @@ export function Crumb({ view, onBack }) {
   );
 }
 
+/**
+ * The two halves of the app, as an actual tab pair rather than one more icon
+ * lost in the sidebar's stack of batch rings. Underlined, not boxed — this
+ * sits above everything else here, so it reads as a mode switch, not a
+ * page action.
+ */
+function ModeTabs({ mode, onNav }) {
+  const tabs = [
+    { id: "dashboard", label: "Dashboard", nav: "overview" },
+    { id: "outputs", label: "Outputs", nav: "outputs" },
+  ];
+  return (
+    <nav className="flex items-center gap-6 -mb-px">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onNav(t.nav)}
+          className={`f-heading text-sm sm:text-base font-bold pb-2.5 border-b-2 transition-colors ${
+            mode === t.id ? "text-foreground" : "text-muted-foreground border-transparent hover:text-foreground"
+          }`}
+          style={mode === t.id ? { borderColor: "var(--primary)" } : undefined}
+        >
+          {t.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 export function Header({
   view,
+  onNav,
   onBack,
   live,
   role,
@@ -75,8 +112,12 @@ export function Header({
   onEditProfile,
 }) {
   const viewOnly = role !== "admin" && role !== "editor";
+  const mode = view.page === "outputs" ? "outputs" : "dashboard";
   return (
     <header className="sticky top-0 z-20 backdrop-blur border-b border-border bg-card/90">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 pt-3 border-b border-border/60">
+        <ModeTabs mode={mode} onNav={onNav} />
+      </div>
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 py-4 flex items-center gap-3 flex-wrap">
         <div className="flex-1 min-w-[200px]">
           <Crumb view={view} onBack={onBack} />

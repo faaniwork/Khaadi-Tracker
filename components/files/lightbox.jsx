@@ -8,26 +8,31 @@ import { driveThumbUrl } from "@/lib/api";
 
 const LIGHTBOX_SIZE = 1600;
 const GRID_SIZE = 600; // matches the grid thumbnail, so it is already cached
+const MIN_SCALE = 1;
+const MAX_SCALE = 4;
+const CLICK_ZOOM = 2.5;
 
 const STATUS_LABEL = {
   approved: { label: "Approved", color: "var(--good)", fg: "var(--good-foreground)" },
-  feedback: { label: "Feedback", color: "var(--warn)", fg: "var(--warn-foreground)" },
   rejected: { label: "Rejected", color: "var(--destructive)", fg: "var(--destructive-foreground)" },
 };
+const COMMENTED_LABEL = { label: "Comments", color: "var(--warn)", fg: "var(--warn-foreground)" };
 
 /**
  * The actual image, as two stacked layers: the grid's own 600px thumbnail
  * (already in the browser cache almost every time, since it is the same URL
  * the grid just rendered) shows immediately, and the full-resolution image
  * fades in over it once it arrives. Keyed by file id from the caller, so
- * switching images remounts this fresh and the fade-in state resets on its
+ * switching images remounts this fresh and the loaded-state resets on its
  * own — no effect needed to watch the index and reset anything.
  */
-function LightboxImage({ file, dressId, zoomed, onToggleZoom }) {
+function LightboxImage({ file, dressId, scale, onWheel, onToggleZoom }) {
   const [loaded, setLoaded] = useState(false);
+  const zoomed = scale > 1;
   return (
     <div
       className={`relative max-w-[92vw] max-h-full overflow-auto rounded-lg ${zoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
+      onWheel={onWheel}
       onClick={onToggleZoom}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -39,7 +44,7 @@ function LightboxImage({ file, dressId, zoomed, onToggleZoom }) {
         style={{
           maxWidth: zoomed ? "none" : "92vw",
           maxHeight: zoomed ? "none" : "80vh",
-          width: zoomed ? "180%" : "auto",
+          width: zoomed ? `${scale * 100}%` : "auto",
           display: loaded ? "none" : "block",
           filter: "blur(1px)",
         }}
@@ -49,11 +54,11 @@ function LightboxImage({ file, dressId, zoomed, onToggleZoom }) {
         src={driveThumbUrl({ fileId: file.id, dressId, size: LIGHTBOX_SIZE })}
         alt={file.name}
         onLoad={() => setLoaded(true)}
-        className="block transition-transform duration-200 ease-out"
+        className="block transition-transform duration-100 ease-out"
         style={{
           maxWidth: zoomed ? "none" : "92vw",
           maxHeight: zoomed ? "none" : "80vh",
-          width: zoomed ? "180%" : "auto",
+          width: zoomed ? `${scale * 100}%` : "auto",
           display: loaded ? "block" : "none",
         }}
       />
@@ -82,21 +87,28 @@ export function Lightbox({
   onClose,
   onIndexChange,
   onApprove,
-  onFeedback,
   onReject,
   onAddComment,
 }) {
-  // Tracks WHICH index is zoomed rather than a plain boolean, so moving to a
-  // different image resets the zoom for free.
-  const [zoomedIndex, setZoomedIndex] = useState(null);
+  // {index, scale} rather than a plain per-lightbox scale, so moving to a
+  // different image resets the zoom for free: once index no longer matches,
+  // the effective scale falls back to 1 with no effect needed to reset it.
+  const [zoomState, setZoomState] = useState({ index: null, scale: 1 });
   const [commentDraft, setCommentDraft] = useState("");
-  const zoomed = zoomedIndex === index;
+  const scale = zoomState.index === index ? zoomState.scale : 1;
+  const setScale = (next) =>
+    setZoomState((z) => {
+      const current = z.index === index ? z.scale : 1;
+      const value = typeof next === "function" ? next(current) : next;
+      return { index, scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, value)) };
+    });
 
   const images = (files || []).filter((f) => !f.isFolder && f.isImage);
   const file = images[index];
   const review = file ? reviews?.[file.id] : null;
   const status = review?.status || "pending";
   const fileComments = (file && comments?.[file.id]) || [];
+  const statusStyle = STATUS_LABEL[status] || (fileComments.length ? COMMENTED_LABEL : null);
   const busy = file ? busyIds?.has(file.id) : false;
   const postingComment = file ? postingCommentIds?.has(file.id) : false;
 
@@ -124,12 +136,18 @@ export function Lightbox({
 
   if (!file) return null;
 
-  const statusStyle = STATUS_LABEL[status];
   const sendComment = () => {
     const text = commentDraft.trim();
     if (!text) return;
     onAddComment?.(file, text);
     setCommentDraft("");
+  };
+  // Mouse wheel and trackpad pinch both arrive as wheel events (pinch sets
+  // ctrlKey on the ones browsers treat as a zoom gesture) — either way,
+  // scrolling over the image zooms it instead of scrolling the page.
+  const onWheelZoom = (e) => {
+    e.preventDefault();
+    setScale((s) => s - e.deltaY * 0.01);
   };
 
   // Portalled straight onto <body>. Rendered inline it would sit inside the
@@ -155,11 +173,11 @@ export function Lightbox({
         </button>
         <button
           type="button"
-          onClick={() => setZoomedIndex((z) => (z === index ? null : index))}
-          aria-label={zoomed ? "Zoom out" : "Zoom in"}
+          onClick={() => setScale((s) => (s > 1 ? 1 : CLICK_ZOOM))}
+          aria-label={scale > 1 ? "Zoom out" : "Zoom in"}
           className="size-9 rounded-full grid place-items-center bg-white/10 text-white hover:bg-white/20 transition-colors"
         >
-          {zoomed ? <ZoomOut className="size-4.5" /> : <ZoomIn className="size-4.5" />}
+          {scale > 1 ? <ZoomOut className="size-4.5" /> : <ZoomIn className="size-4.5" />}
         </button>
         <div className="flex-1 min-w-0 text-center">
           <p className="f-mono text-sm font-bold text-white">
@@ -207,8 +225,9 @@ export function Lightbox({
           key={file.id}
           file={file}
           dressId={dressId}
-          zoomed={zoomed}
-          onToggleZoom={() => setZoomedIndex((z) => (z === index ? null : index))}
+          scale={scale}
+          onWheel={onWheelZoom}
+          onToggleZoom={() => setScale((s) => (s > 1 ? 1 : CLICK_ZOOM))}
         />
       </div>
 
@@ -217,10 +236,6 @@ export function Lightbox({
       <div className="shrink-0 border-t border-white/10 bg-black/40 px-4 py-3">
         {status === "rejected" && review?.text ? (
           <p className="text-xs text-center mb-2" style={{ color: "var(--destructive)" }}>
-            {review.text}
-          </p>
-        ) : status === "feedback" && review?.text ? (
-          <p className="text-xs text-center mb-2" style={{ color: "var(--warn)" }}>
             {review.text}
           </p>
         ) : null}
@@ -239,19 +254,6 @@ export function Lightbox({
               }
             >
               <Check className="size-3.5" /> Approve
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onFeedback?.(file)}
-              className="rounded-xl px-4 py-2 text-xs font-bold flex items-center gap-1.5 border transition-colors disabled:opacity-50"
-              style={
-                status === "feedback"
-                  ? { background: "var(--warn)", color: "var(--warn-foreground)", borderColor: "var(--warn)" }
-                  : { borderColor: "rgba(255,255,255,.2)", color: "var(--warn)" }
-              }
-            >
-              <MessageCircle className="size-3.5" /> Feedback
             </button>
             <button
               type="button"
@@ -287,6 +289,7 @@ export function Lightbox({
             ) : null}
             {canReview ? (
               <div className="flex items-center gap-1.5">
+                <MessageCircle className="size-3.5 text-white/50 shrink-0" />
                 <input
                   type="text"
                   value={commentDraft}
