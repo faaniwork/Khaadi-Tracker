@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS dresses (
   files INTEGER,
   comments TEXT NOT NULL DEFAULT '',
   credits INTEGER NOT NULL DEFAULT 0,
+  revisions INTEGER NOT NULL DEFAULT 1,   -- 1-9, see migration/002_add_revisions.sql
   updated_by TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL DEFAULT 0
 );
