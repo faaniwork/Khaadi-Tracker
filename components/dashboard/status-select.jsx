@@ -49,7 +49,7 @@ export function BulkStatusControl({ disabled, onPick }) {
       }}
       className="rounded-[10px] border border-border bg-secondary/60 px-2.5 py-1.5 text-xs font-semibold text-foreground cursor-pointer outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <option value="">Set all to…</option>
+      <option value="">Set status…</option>
       {STATUS_OPTIONS.map((s) => (
         <option key={s} value={s}>
           {s}

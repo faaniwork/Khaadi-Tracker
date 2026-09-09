@@ -5,29 +5,6 @@ import { MascotRider } from "@/components/mascot";
 import { BulkStatusControl } from "./status-select";
 import { CostInput } from "./dress-table";
 
-const STATUS_ORDER = ["Delivered", "In Progress", "Needs Revision", "Not Started", "Discarded"];
-const STATUS_COLOR = {
-  Delivered: "var(--good)",
-  "In Progress": "var(--info)",
-  "Needs Revision": "var(--warn)",
-  "Not Started": "var(--muted-foreground)",
-  Discarded: "var(--destructive)",
-};
-
-function BreakdownBar({ subset, h = 8 }) {
-  const total = subset.length || 1;
-  return (
-    <div className="flex rounded-full overflow-hidden bg-muted" style={{ height: h }}>
-      {STATUS_ORDER.map((s) => {
-        const n = subset.filter((r) => (r.status || "Not Started") === s).length;
-        if (!n) return null;
-        const pct = (n / total) * 100;
-        return <div key={s} title={`${s}: ${n}`} style={{ width: `${pct}%`, background: STATUS_COLOR[s] }} />;
-      })}
-    </div>
-  );
-}
-
 function BarRow({ label, pct, valueLabel }) {
   return (
     <div className="flex items-center gap-3">
@@ -79,7 +56,7 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
         <StatTile label="Needs Revision" value={fmt(revision)} colorVar="var(--warn)" Icon={ShieldAlert} />
         <StatTile label="Credit Cost" value={fmt(totalCost)} colorVar="var(--destructive)" Icon={Coins} />
       </div>
-      <div className="rounded-[20px] border border-border bg-card p-4 mb-5 rise" style={{ overflow: "visible" }}>
+      <div className="mb-6" style={{ overflow: "visible" }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Road to 1,000 — {fmt(delivered)} of {fmt(MILESTONE_TARGET)} delivered
@@ -151,24 +128,17 @@ export function BatchCard({ rel, rr, colCount, noteCount, cost, canEdit, sync, o
       className="rounded-[20px] border border-border bg-card p-5 rise relative overflow-hidden card-hover transition-shadow"
       style={allDiscarded ? { borderColor: "var(--destructive)" } : undefined}
     >
-      <div className="flex items-start gap-4 mb-4">
-        <Ring pct={allDiscarded ? 100 : pct} size={60} color={ringColor} label={ringLabel} />
+      <div className="flex items-center gap-4 mb-5">
+        <Ring pct={allDiscarded ? 100 : pct} size={64} color={ringColor} label={ringLabel} />
         <div className="min-w-0">
-          <h3
-            className={`f-heading font-bold text-lg leading-tight truncate text-foreground ${
-              allDiscarded ? "line-through opacity-70" : ""
-            }`}
-          >
-            {rel}
-          </h3>
+          <h3 className="f-heading font-bold text-lg leading-tight truncate text-foreground">{rel}</h3>
           <p className="text-xs mt-0.5 text-muted-foreground">
             {colCount} collection{colCount === 1 ? "" : "s"} · {rr.length} dress{rr.length === 1 ? "" : "es"} · {delivered} delivered
             {noteCount ? ` · ${noteCount} note${noteCount === 1 ? "" : "s"}` : ""}
           </p>
         </div>
       </div>
-      <BreakdownBar subset={rr} />
-      <div className="flex items-center gap-2 flex-wrap mt-4">
+      <div className="flex items-center gap-2 flex-wrap">
         <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("release", rel, status, rr.length)} />
         <CostInput
           scope="release"
@@ -195,7 +165,7 @@ export function BatchCard({ rel, rr, colCount, noteCount, cost, canEdit, sync, o
             rel="noopener noreferrer"
             className="rounded-xl bg-secondary border border-border text-foreground text-xs px-3 py-2 flex items-center gap-1.5 font-bold"
           >
-            <Folder className="size-3.5" /> Folder
+            <Folder className="size-3.5" /> Drive
           </a>
         ) : null}
       </div>

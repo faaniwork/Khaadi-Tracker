@@ -597,7 +597,7 @@ export function Dashboard({ user }) {
       <div className="min-h-screen bg-background">
         <header className="flex items-center gap-3 px-4 sm:px-6 py-3.5 border-b border-border bg-card sticky top-0 z-10">
           <Logo width={40} />
-          <span className="f-heading font-bold text-sm text-foreground">Outputs</span>
+          <span className="f-heading font-bold text-sm text-foreground">Khaadi PDPs</span>
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
@@ -710,7 +710,7 @@ export function Dashboard({ user }) {
               )}
             </>
           ) : view.page === "activity" ? (
-            <ActivityPage profiles={profiles} />
+            <ActivityPage profiles={profiles} rows={rows} onNav={onNav} />
           ) : view.page === "access" ? (
             <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
           ) : view.page === "outputs" ? (

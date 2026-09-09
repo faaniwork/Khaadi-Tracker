@@ -118,7 +118,7 @@ export function BatchPage({
                 rel="noopener noreferrer"
                 className="rounded-xl bg-secondary border border-border text-foreground text-xs px-3 py-2 flex items-center gap-1.5 font-bold"
               >
-                <Folder className="size-3.5" /> Folder
+                <Folder className="size-3.5" /> Drive
               </a>
             ) : null}
             {canEdit ? (

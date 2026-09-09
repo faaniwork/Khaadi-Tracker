@@ -7,16 +7,15 @@ import { Button } from "@/components/ui/button";
 export const FEEDBACK_REASONS = [
   { value: "accuracy", label: "Accuracy", hint: "Garment, colour or detail is wrong" },
   { value: "pose", label: "Pose", hint: "Body, hands or angle is off" },
-  { value: "other", label: "Something else", hint: "Tell us in a line" },
 ];
 
 /**
  * Collects the reason for a rejection.
  *
  * A rejection without a reason is close to useless to whoever has to fix the
- * image, so the reason is required, and picking "Something else" requires the
- * note that makes it actionable. The submit button stays disabled until
- * there is enough to act on rather than failing after the click.
+ * image, so a reason is always required; the note below it is where any
+ * detail beyond the reason goes; there is deliberately no third "something
+ * else" reason that just duplicated what that note already covers.
  */
 export function RejectDialog({ open, fileName, saving, error, onSubmit, onCancel }) {
   const [reason, setReason] = useState("accuracy");
@@ -41,12 +40,11 @@ export function RejectDialog({ open, fileName, saving, error, onSubmit, onCancel
 
   if (!open) return null;
 
-  const needsText = reason === "other";
-  const canSubmit = Boolean(reason) && (!needsText || text.trim().length > 0) && !saving;
+  const canSubmit = Boolean(reason) && !saving;
 
-  // Portalled onto <body> — see the same note in feedback-dialog.jsx: this
-  // would otherwise be trapped inside the dress card's animated `rise`
-  // wrapper instead of centering on the actual viewport.
+  // Portalled onto <body> — an animated ancestor (the dress card's `rise`
+  // entrance) creates a containing block for position:fixed, which would
+  // otherwise centre this within that card's box instead of the viewport.
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="presentation">
       <div
@@ -65,12 +63,12 @@ export function RejectDialog({ open, fileName, saving, error, onSubmit, onCancel
         </h2>
         <p className="mt-1 text-sm text-muted-foreground break-words">{fileName}</p>
 
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="mt-4">
           {FEEDBACK_REASONS.map((r, i) => (
             <label
               key={r.value}
-              className={`flex items-start gap-2.5 rounded-xl border p-3 cursor-pointer transition-colors ${
-                reason === r.value ? "border-primary bg-primary/5" : "border-border hover:bg-secondary"
+              className={`flex items-center gap-3 py-2.5 cursor-pointer ${
+                i > 0 ? "border-t border-border" : ""
               }`}
             >
               <input
@@ -80,36 +78,26 @@ export function RejectDialog({ open, fileName, saving, error, onSubmit, onCancel
                 value={r.value}
                 checked={reason === r.value}
                 onChange={() => setReason(r.value)}
-                className="mt-0.5 accent-[var(--primary)]"
+                className="size-4 accent-[var(--primary)]"
               />
               <span className="min-w-0">
-                <span className="block text-sm font-bold text-foreground">{r.label}</span>
+                <span className={`block text-sm ${reason === r.value ? "font-bold text-foreground" : "font-semibold text-foreground/80"}`}>
+                  {r.label}
+                </span>
                 <span className="block text-xs text-muted-foreground">{r.hint}</span>
               </span>
             </label>
           ))}
         </div>
 
-        {needsText ? (
-          <textarea
-            autoFocus
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={3}
-            maxLength={500}
-            placeholder="What's wrong with this one?"
-            className="mt-3 w-full rounded-xl border border-border bg-secondary/60 px-3 py-2 text-sm outline-none focus-visible:border-primary resize-y"
-          />
-        ) : (
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={2}
-            maxLength={500}
-            placeholder="Anything to add? (optional)"
-            className="mt-3 w-full rounded-xl border border-border bg-secondary/60 px-3 py-2 text-sm outline-none focus-visible:border-primary resize-y"
-          />
-        )}
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={2}
+          maxLength={500}
+          placeholder="Anything to add? (optional)"
+          className="mt-1 w-full border-b border-border bg-transparent px-0.5 py-2 text-sm outline-none focus-visible:border-primary resize-y"
+        />
 
         {error ? (
           <p className="mt-3 text-sm" style={{ color: "var(--destructive)" }}>
@@ -127,7 +115,7 @@ export function RejectDialog({ open, fileName, saving, error, onSubmit, onCancel
             disabled={!canSubmit}
             onClick={() => onSubmit({ reason, feedbackText: text.trim() })}
           >
-            {saving ? "Sending…" : "Send feedback"}
+            {saving ? "Sending…" : "Reject"}
           </Button>
         </div>
       </div>

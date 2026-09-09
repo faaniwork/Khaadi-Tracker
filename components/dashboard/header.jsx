@@ -9,7 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 const PAGE_TITLES = {
   activity: ["Activity", "Who changed what, tracked in real time"],
   access: ["Access & roles", "Manage who can view, edit, or manage this board"],
-  outputs: ["Outputs", "Batches, collections and dresses — the images, nothing else"],
+  outputs: ["Khaadi PDPs", "Batches, collections and dresses — the images, nothing else"],
 };
 
 export function Crumb({ view, onBack }) {
@@ -71,7 +71,7 @@ export function Crumb({ view, onBack }) {
 function ModeTabs({ mode, onNav }) {
   const tabs = [
     { id: "dashboard", label: "Dashboard", nav: "overview" },
-    { id: "outputs", label: "Outputs", nav: "outputs" },
+    { id: "outputs", label: "Khaadi PDPs", nav: "outputs" },
   ];
   return (
     <nav className="flex items-center gap-6 -mb-px">
@@ -115,7 +115,7 @@ export function Header({
   const mode = view.page === "outputs" ? "outputs" : "dashboard";
   return (
     <header className="sticky top-0 z-20 backdrop-blur border-b border-border bg-card/90">
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 pt-3 border-b border-border/60">
+      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 pt-5 sm:pt-6 border-b border-border/60">
         <ModeTabs mode={mode} onNav={onNav} />
       </div>
       <div className="max-w-[1280px] mx-auto px-5 sm:px-8 py-4 flex items-center gap-3 flex-wrap">

@@ -29,9 +29,14 @@ const COMMENTED_LABEL = { label: "Comments", color: "var(--warn)", fg: "var(--wa
 function LightboxImage({ file, dressId, scale, onWheel, onToggleZoom }) {
   const [loaded, setLoaded] = useState(false);
   const zoomed = scale > 1;
+  // The frame itself never changes size — only the image inside it scales,
+  // from its own centre. Growing the image's *width* instead (the previous
+  // approach) reflows it inside a scrolling box that starts scrolled to its
+  // top-left corner, which is what made zooming in look like it was
+  // yanking the picture into a corner instead of magnifying it in place.
   return (
     <div
-      className={`relative max-w-[92vw] max-h-full overflow-auto rounded-lg ${zoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
+      className={`relative max-w-[92vw] max-h-full overflow-hidden rounded-lg ${zoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
       onWheel={onWheel}
       onClick={onToggleZoom}
     >
@@ -40,11 +45,11 @@ function LightboxImage({ file, dressId, scale, onWheel, onToggleZoom }) {
         src={driveThumbUrl({ fileId: file.id, dressId, size: GRID_SIZE })}
         alt=""
         aria-hidden="true"
-        className="block"
+        className="block transition-transform duration-100 ease-out"
         style={{
-          maxWidth: zoomed ? "none" : "92vw",
-          maxHeight: zoomed ? "none" : "80vh",
-          width: zoomed ? `${scale * 100}%` : "auto",
+          maxWidth: "92vw",
+          maxHeight: "80vh",
+          transform: `scale(${scale})`,
           display: loaded ? "none" : "block",
           filter: "blur(1px)",
         }}
@@ -56,9 +61,9 @@ function LightboxImage({ file, dressId, scale, onWheel, onToggleZoom }) {
         onLoad={() => setLoaded(true)}
         className="block transition-transform duration-100 ease-out"
         style={{
-          maxWidth: zoomed ? "none" : "92vw",
-          maxHeight: zoomed ? "none" : "80vh",
-          width: zoomed ? `${scale * 100}%` : "auto",
+          maxWidth: "92vw",
+          maxHeight: "80vh",
+          transform: `scale(${scale})`,
           display: loaded ? "block" : "none",
         }}
       />
@@ -147,7 +152,11 @@ export function Lightbox({
   // scrolling over the image zooms it instead of scrolling the page.
   const onWheelZoom = (e) => {
     e.preventDefault();
-    setScale((s) => s - e.deltaY * 0.01);
+    // A plain mouse wheel reports deltaY in big steps (~100 per notch); a
+    // trackpad reports many small ones. 0.01 treated one mouse-wheel notch
+    // as "go from 1x to 2x", which read as the image leaping to a random
+    // zoom level rather than zooming — this is gentle enough for both.
+    setScale((s) => s - e.deltaY * 0.0025);
   };
 
   // Portalled straight onto <body>. Rendered inline it would sit inside the

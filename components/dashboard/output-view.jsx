@@ -153,7 +153,7 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center gap-1.5 flex-wrap mb-5 text-sm">
-        {crumb("Outputs", () => {
+        {crumb("Khaadi PDPs", () => {
           setRelease(null);
           setCollection(null);
           setDress(null);
