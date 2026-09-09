@@ -220,9 +220,14 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     setConfirmTrash(null);
     markBusy(file.id, true);
     try {
-      await driveTrashFile({ dressId: dress.id, fileId: file.id });
+      const res = await driveTrashFile({ dressId: dress.id, fileId: file.id });
       setState((s) => ({ ...s, files: s.files.filter((f) => f.id !== file.id) }));
-      showToast?.(`"${file.name}" moved to Drive trash`, "ok");
+      showToast?.(
+        res?.method === "moved"
+          ? `"${file.name}" moved to the Removed folder in Drive`
+          : `"${file.name}" moved to Drive trash`,
+        "ok"
+      );
     } catch (e) {
       showToast?.(e.message || "Could not remove the file", "error");
     } finally {
@@ -384,9 +389,9 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       />
       <ConfirmDialog
         open={Boolean(confirmTrash)}
-        title="Move this file to Drive trash?"
-        description={`"${confirmTrash?.name || ""}" will disappear from here straight away. It stays restorable from Drive's trash for 30 days.`}
-        confirmLabel="Move to trash"
+        title="Remove this file?"
+        description={`"${confirmTrash?.name || ""}" will disappear from here straight away. Nothing is destroyed — it goes to Drive's trash, or to a "Removed" folder in Drive if its owner hasn't given us trash rights.`}
+        confirmLabel="Remove"
         onConfirm={doTrash}
         onCancel={() => setConfirmTrash(null)}
       />
