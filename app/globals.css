@@ -176,18 +176,6 @@ button, a { touch-action: manipulation; }
   }
 }
 
-/* The chat tab's hover "nod": a brief wobble layered on top of the sustained
-   pulled-out hover state (see ChatWidget) - plays once per hover via a class
-   toggled in JS and cleared on animationend, ending at the same translateX
-   the plain hover transition holds, so removing the class causes no jump. */
-@keyframes chatTabNod {
-  0% { transform: translateX(0) rotate(0deg); }
-  30% { transform: translateX(-8px) rotate(-6deg); }
-  60% { transform: translateX(-14px) rotate(4deg); }
-  100% { transform: translateX(-12px) rotate(0deg); }
-}
-.chat-tab-nod { animation: chatTabNod 480ms cubic-bezier(.34,1.4,.64,1) both; }
-
 /* One orchestrated reveal on load beats a dozen unrelated micro-animations.
    Children come in on a 40ms ladder, capped at eight so a long list never
    waits a third of a second for its tail. */
@@ -238,14 +226,28 @@ button, a { touch-action: manipulation; }
 .progress-zone:hover .mascot-rider, .mascot-rider:focus-within, .mascot-rider.is-active { opacity: 1; transition: opacity 220ms ease; }
 .mascot-rider:hover .mascot-svg, .mascot-rider:focus-within .mascot-svg { animation-duration: .5s; }
 .mascot-bubble {
-  position: absolute; bottom: calc(100% + 10px); left: 50%; width: 172px; transform: translate(-50%,8px) scale(.85);
+  /* --bx is the resting horizontal offset - a CSS variable rather than a
+     value repeated in every rule below, since the shown/hover state needs
+     the same X offset as the resting one and only animates Y and scale. */
+  --bx: -50%;
+  position: absolute; bottom: calc(100% + 10px); left: 50%; width: 172px; max-width: calc(100vw - 24px);
+  transform: translate(var(--bx),8px) scale(.85);
   background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 12px;
   padding: 8px 11px; font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center; white-space: normal;
   box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.25); opacity: 0; pointer-events: none;
   transition: opacity 120ms ease, transform 180ms cubic-bezier(.34,1.56,.64,1);
 }
+/* Anchored from the mascot's own edge instead of straddling it, for when
+   the mascot itself sits close enough to the track's edge that a centred
+   172px bubble would spill off the viewport - see MascotRider in
+   components/mascot.jsx for when these apply. The pointer triangle moves
+   to the same edge so it still reads as pointing at the mascot. */
+.mascot-bubble.align-start { left: 0; --bx: 0%; }
+.mascot-bubble.align-end { left: 100%; --bx: -100%; }
 .mascot-bubble::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--popover); }
-.mascot-rider:hover .mascot-bubble, .mascot-rider:focus-within .mascot-bubble, .mascot-bubble.is-shown { opacity: 1; transform: translate(-50%,0) scale(1); pointer-events: auto; }
+.mascot-bubble.align-start::after { left: 14px; transform: none; }
+.mascot-bubble.align-end::after { left: auto; right: 14px; transform: none; }
+.mascot-rider:hover .mascot-bubble, .mascot-rider:focus-within .mascot-bubble, .mascot-bubble.is-shown { opacity: 1; transform: translate(var(--bx),0) scale(1); pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .mascot-svg { animation: none; } .mascot-rider { opacity: 1; transition: none; } }
 
 /* A scroll region that reads as a section rather than as content being

@@ -59,12 +59,21 @@ export function MascotSVG({ mood }) {
 }
 
 export function MascotRider({ mood, message, active, onClick, leftPct }) {
+  // The bubble is centred on the mascot by default, which overflows off a
+  // narrow screen the moment the mascot itself sits near either end of its
+  // track (a real, reproduced bug: at low progress the mascot clamps toward
+  // the left edge, and a 172px bubble centred on a point that close to the
+  // edge spills straight off a phone's viewport). Past roughly a fifth of
+  // the way in from either edge, the bubble anchors from that edge of the
+  // mascot instead of straddling it - see the align-start/align-end rules
+  // in globals.css, which move the little pointer triangle to match.
+  const align = leftPct < 22 ? "align-start" : leftPct > 78 ? "align-end" : "";
   return (
     <div
       className={`mascot-rider${active ? " is-active" : ""}`}
       style={{ left: `${leftPct}%` }}
     >
-      <div className={`mascot-bubble${active ? " is-shown" : ""}`}>{message}</div>
+      <div className={`mascot-bubble ${align}${active ? " is-shown" : ""}`}>{message}</div>
       <button
         type="button"
         className="mascot-btn"

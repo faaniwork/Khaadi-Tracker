@@ -911,16 +911,15 @@ export function Dashboard({ user }) {
               />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
               <div className="flex-1 min-h-0 flex flex-col rounded-[14px] border border-border bg-card/40 px-4 pt-3.5 pb-1 mb-1">
+              {/* No "Batches" heading - "Add batch" already says what this
+                  section is without repeating itself, and Check Drive drops
+                  to an icon since its tooltip already carries the meaning. */}
               <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <h2 className="f-heading text-sm font-semibold text-foreground">
-                  Batches
-                  {statusFilter ? (
-                    <span className="text-muted-foreground font-normal">
-                      {" "}
-                      · {visibleReleases.length} with {statusFilter.toLowerCase()}
-                    </span>
-                  ) : null}
-                </h2>
+                {statusFilter ? (
+                  <span className="text-xs text-muted-foreground">
+                    {visibleReleases.length} with {statusFilter.toLowerCase()}
+                  </span>
+                ) : null}
                 {canEdit ? (
                   <Button size="sm" variant="ghost" onClick={() => setAddingBatch(true)}>
                     <Plus className="size-3.5" /> Add batch
@@ -928,14 +927,14 @@ export function Dashboard({ user }) {
                 ) : null}
                 {canEdit ? (
                   <Button
-                    size="sm"
+                    size="icon"
                     variant="ghost"
                     onClick={() => checkDrive()}
                     disabled={checkingDrive}
-                    title="Check every batch still exists in Drive"
+                    aria-label={checkingDrive ? "Checking Drive" : "Check every batch still exists in Drive"}
+                    title={checkingDrive ? "Checking Drive" : "Check every batch still exists in Drive"}
                   >
                     <RefreshCw className={`size-3.5 ${checkingDrive ? "animate-spin" : ""}`} />
-                    {checkingDrive ? "Checking Drive" : "Check Drive"}
                   </Button>
                 ) : null}
                 <div className="ml-auto flex items-center gap-1.5">

@@ -43,7 +43,6 @@ export function ChatWidget({ user, profiles }) {
   const [busy, setBusy] = useState(false);
   const [uploadPct, setUploadPct] = useState(null); // null when not uploading
   const [dragOver, setDragOver] = useState(false);
-  const [nodding, setNodding] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -419,30 +418,27 @@ export function ChatWidget({ user, profiles }) {
 
       {/* The tab itself: a solid pill welded to the edge (rounded only on
           the side facing the page, flush and borderless on the side facing
-          off-screen), not a floating circular bubble - a hand-drawn wavy
-          outline was tried here and looked like an amorphous blob without
-          being able to see it live, so it's gone; this plain shape reads
-          correctly at a glance, which is what actually matters. On hover it
-          noses further out (translateX) with a brief rotating "nod" wobble
-          layered on top (chatTabNod, triggered once per hover via the class
-          below and cleared on animationend so the next hover plays it
-          again) before settling into the pulled-out resting position - see
-          the matching keyframes in globals.css. Anchored near the bottom,
-          clear of the phone's fixed tab bar below md the same way the toast
-          is (see components/toast.jsx). Hidden while the panel itself is
-          open rather than turned into a close button, since the panel
-          already has its own. */}
+          off-screen), not a floating circular bubble. On hover it simply
+          bulges and slides out (translateX + a touch of scale) - a rotating
+          "nod" wobble was tried on top of this and undid exactly what made
+          it work: a plain, slow pull-out that reads as the tab starting to
+          open, not a shake. Anchored near the bottom, clear of the phone's
+          fixed tab bar below md the same way the toast is (see
+          components/toast.jsx). Hidden while the panel itself is open
+          rather than turned into a close button, since the panel already
+          has its own. */}
       {!open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          onMouseEnter={() => setNodding(true)}
-          onAnimationEnd={() => setNodding(false)}
           aria-label="Open chat"
-          className={`fixed z-50 right-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-12 flex items-center justify-center h-14 w-11 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-transform duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-x-2 active:scale-95 ${nodding ? "chat-tab-nod" : ""}`}
+          className="fixed z-50 right-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-12 flex items-center justify-center h-14 w-11 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-transform duration-500 ease-out hover:-translate-x-2.5 hover:scale-105 active:scale-95"
           style={{ transformOrigin: "right center" }}
         >
-          <MessageCircle className="size-5" />
+          {/* Nudged toward the flush edge, not the geometric centre of the
+              box: rounded-l-full tapers the left side away, so a perfectly
+              centred icon reads as drifted toward that rounded side. */}
+          <MessageCircle className="size-5 translate-x-1" />
           {pendingCount ? (
             <span
               className="absolute top-1 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
