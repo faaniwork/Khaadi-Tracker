@@ -47,6 +47,10 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const reviewAllowed = canReview ?? canWrite;
   const [state, setState] = useState({ folderId: null, error: "", files: [], reviews: {}, comments: {} });
   const [rootFiles, setRootFiles] = useState([]);
+  // Reshoot rounds that already live as separate sibling "V2"/"V3" folders
+  // in Drive rather than inside this dress folder - editors/admins only,
+  // see the extraVersions gate in app/api/drive/list/route.js.
+  const [extraVersions, setExtraVersions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [trail, setTrail] = useState([]); // subfolders opened below the dress folder
   const [upload, setUpload] = useState({ active: false, progress: 0 });
@@ -101,7 +105,10 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           });
           // Remembered from the dress folder itself, so the version switcher
           // still knows what exists while you are inside V2.
-          if (folderId === dress.id) setRootFiles(data.files || []);
+          if (folderId === dress.id) {
+            setRootFiles(data.files || []);
+            setExtraVersions(data.extraVersions || []);
+          }
         })
         .catch((e) => {
           if (isStale?.()) return;
@@ -496,6 +503,29 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               Corrections only. The full set is under Original.
             </span>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* A later reshoot round that already lives as its own sibling "V2"/
+          "V3" folder in Drive, one level up from this dress folder rather
+          than inside it - a different layout than the Original/V2 tabs
+          above, so it opens in Drive itself instead of pretending to be
+          another tab of this same view. */}
+      {extraVersions.length ? (
+        <div className="flex items-center gap-1.5 flex-wrap mb-4 pb-4 border-b border-border text-xs">
+          <span className="text-muted-foreground">Also shot as:</span>
+          {extraVersions.map((v) => (
+            <a
+              key={v.folderId}
+              href={v.webViewLink || `https://drive.google.com/drive/folders/${v.folderId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Opens this reshoot round in Google Drive"
+              className="font-semibold text-primary hover:underline"
+            >
+              {v.folderName || `V${v.version}`} ↗
+            </a>
+          ))}
         </div>
       ) : null}
 

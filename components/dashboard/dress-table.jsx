@@ -23,7 +23,12 @@ export function CostInput({ scope, keyName, value, syncState, disabled, onChange
         placeholder="0"
         disabled={disabled}
         onChange={(e) => onChange(scope, keyName, e.target.value)}
-        className="bg-transparent border-0 outline-none w-14 font-semibold text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal disabled:opacity-60"
+        // w-14 clipped its own last digit the moment a batch cost hit six
+        // figures (130000 rendered as "13000" cut off by the pill's own
+        // edge) - w-20 clears eight digits at this font size with room to
+        // spare, which this project's own costs are already most of the
+        // way to needing.
+        className="bg-transparent border-0 outline-none w-20 font-semibold text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal disabled:opacity-60"
       />
     </label>
   );

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listFolder, listDressFiles, isWithinDress } from '@/lib/drive';
-import { getReviewsForDress, getCommentsForDress } from '@/lib/db';
+import { getReviewsForDress, getCommentsForDress, getDressVersionFolders } from '@/lib/db';
 import { resolveCaller, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 /**
@@ -45,13 +45,19 @@ export async function GET(req) {
     }
 
     const isRoot = target === dress.id;
-    const [files, reviews, comments] = await Promise.all([
+    // Reshoot rounds that live as separate sibling "V2"/"V3" folders in
+    // Drive rather than inside this dress folder (see dress_version_folders)
+    // - editors and admins only, same audience the folderId escape hatch
+    // above is limited to, since a review-token client's whole world is
+    // meant to be exactly what got curated for them.
+    const [files, reviews, comments, extraVersions] = await Promise.all([
       // At the dress folder itself, rejected images are folded back in so
       // they stay visible and a decision stays reversible. Deeper subfolders
       // are listed plainly.
       isRoot ? listDressFiles(dress.id) : listFolder(target),
       getReviewsForDress(dress.id),
       getCommentsForDress(dress.id),
+      isRoot && caller.canWrite ? getDressVersionFolders(dress.id) : [],
     ]);
 
     return NextResponse.json({
@@ -61,6 +67,7 @@ export async function GET(req) {
       files,
       reviews,
       comments,
+      extraVersions,
       canWrite: caller.canWrite,
       canReview: caller.canReview,
       callerKind: caller.kind,
