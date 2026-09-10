@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { Trash2, UserPlus } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { fetchAccess, saveAccess, deleteAccess } from "@/lib/api";
@@ -112,13 +112,12 @@ export function AccessPage({ role, currentEmail, showToast }) {
   };
 
   return (
+    // No heading here - it would only repeat, almost word for word, what
+    // the page header above already says ("Access & roles" / "Manage who
+    // can view, edit, or manage this board"), the same redundancy already
+    // trimmed from Khaadi PDPs. Unlike Activity's own inner header, this one
+    // had no controls of its own hanging off it to justify keeping it.
     <div className="rounded-[14px] border border-border bg-card p-5 rise">
-      <div className="flex items-center gap-2 mb-4">
-        <ShieldCheck className="size-4 text-primary" />
-        <h2 className="f-heading font-bold text-sm text-foreground">Access &amp; roles</h2>
-        <span className="text-xs text-muted-foreground">who can view, edit, or manage this board</span>
-      </div>
-
       <form onSubmit={addNew} className="flex gap-2 items-center flex-wrap mb-5 p-3 rounded-xl bg-secondary/40 border border-border">
         <Input
           type="email"
