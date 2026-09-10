@@ -208,15 +208,16 @@ export function ChatWidget({ user, profiles }) {
           onDragOver={status === "granted" ? onDragOver : undefined}
           onDragLeave={status === "granted" ? onDragLeave : undefined}
           onDrop={status === "granted" ? onDrop : undefined}
-          // Docked to the right edge near the bottom on a real screen, the
-          // same anchor the tab itself uses - flush on the right, rounded
-          // only where it faces the page, so the panel reads as having been
-          // pulled out of the tab rather than a card floating free in a
-          // corner. Below md that entire idea stops making sense (there is
+          // Docked to the right edge, sitting at the exact same bottom
+          // offset as the tab itself (md:bottom-12 below, matching the
+          // trigger button) so the panel reads as having grown straight out
+          // of the tab's own spot rather than popping up somewhere else on
+          // the screen. Rounded only where it faces the page, flush on the
+          // right. Below md that entire idea stops making sense (there is
           // no room beside a phone-width viewport for a docked side panel),
           // so it takes over the whole screen instead, the way a chat app
           // opens a full conversation view rather than a popover.
-          className="fixed z-50 inset-0 md:inset-auto md:right-0 md:bottom-[calc(11rem+env(safe-area-inset-bottom))] flex flex-col w-full md:w-[min(360px,calc(100vw-2rem))] h-full md:h-[min(520px,calc(100vh-11rem))] rounded-none md:rounded-l-[20px] border-0 md:border md:border-r-0 border-border bg-card shadow-xl overflow-hidden chat-slide-in"
+          className="fixed z-50 inset-0 md:inset-auto md:right-0 md:bottom-12 flex flex-col w-full md:w-[min(360px,calc(100vw-2rem))] h-full md:h-[min(520px,calc(100vh-7rem))] rounded-none md:rounded-l-[20px] border-0 md:border md:border-r-0 border-border bg-card shadow-xl overflow-hidden chat-slide-in"
         >
           <div
             className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border bg-secondary/40"
