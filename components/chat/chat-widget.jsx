@@ -10,16 +10,18 @@ const STATUS_POLL_MS = 20000;
 const MESSAGES_POLL_MS = 4000;
 
 /**
- * The board-wide chat, floating over every page the way a support widget
- * does on a marketing site - except this one is for the team and a client
- * to actually talk in, not a bot answering FAQs.
+ * The board-wide chat. Not a floating corner bubble - a tab welded to the
+ * right edge of the screen, the way a boarding pass keeps its QR code as a
+ * half-circle peeking out from the card's own edge rather than a button
+ * sitting on top of the design. It leans out a little further on hover, the
+ * same invitation: this is a tab, it wants to be pulled open.
  *
  * Deliberately not gated by the board's own admin/editor/viewer/client
  * roles: an admin or editor always has it (see hasChatAccess in lib/db.js),
  * but a viewer or client only gets in once an admin grants it, so a random
  * person who merely has view access to the board never even learns this
- * conversation exists - the bubble itself only renders once the first
- * status check comes back, and until then nothing shows at all.
+ * conversation exists - the tab itself only renders once the first status
+ * check comes back, and until then nothing shows at all.
  */
 export function ChatWidget({ user }) {
   const [open, setOpen] = useState(false);
@@ -124,15 +126,15 @@ export function ChatWidget({ user }) {
     <>
       {open ? (
         <div
-          // Bottom offset clears the phone's own fixed tab bar (see
-          // MobileNav in nav.jsx) below md, the same way the toast and the
-          // bar itself do - the bubble is one tab-bar-height further down
-          // again, so the panel sits just above the bubble in both cases.
-          className="fixed z-50 right-5 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] md:bottom-24 flex flex-col w-[min(360px,calc(100vw-2.5rem))] h-[min(520px,calc(100vh-11rem))] rounded-[16px] border border-border bg-card shadow-xl overflow-hidden rise"
+          // Docked to the right edge and vertically centred, the same
+          // anchor the tab itself uses (see the trigger below) rather than
+          // a card floating free in a corner - flush on the right, rounded
+          // only where it faces the page.
+          className="fixed z-50 right-0 top-1/2 flex flex-col w-[min(360px,calc(100vw-2rem))] h-[min(520px,calc(100vh-4rem))] rounded-l-[20px] border border-r-0 border-border bg-card shadow-xl overflow-hidden chat-slide-in"
         >
           <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border bg-secondary/40">
             <MessageCircle className="size-4 text-primary" />
-            <h2 className="f-heading text-sm font-bold text-foreground">Team &amp; client chat</h2>
+            <h2 className="f-heading text-sm font-bold text-foreground">Chat</h2>
             {isAdmin && pendingCount ? (
               <button
                 type="button"
@@ -207,7 +209,7 @@ export function ChatWidget({ user }) {
                   type="text"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Message the team…"
+                  placeholder="Message…"
                   disabled={busy}
                   className="flex-1 min-w-0 rounded-full border border-border bg-secondary/60 px-3.5 py-2 text-sm outline-none focus-visible:border-primary disabled:opacity-60"
                 />
@@ -249,24 +251,32 @@ export function ChatWidget({ user }) {
         </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-label={open ? "Close chat" : "Open chat"}
-        // Lifted clear of the phone's fixed bottom tab bar below md - see
-        // the matching comment on the toast in components/toast.jsx.
-        className="fixed z-50 right-5 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 size-14 rounded-full grid place-items-center bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
-      >
-        {open ? <X className="size-5" /> : <MessageCircle className="size-5" />}
-        {!open && pendingCount ? (
-          <span
-            className="absolute -top-1 -right-1 size-5 rounded-full grid place-items-center f-mono text-[10px] font-bold"
-            style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
-          >
-            {pendingCount}
-          </span>
-        ) : null}
-      </button>
+      {/* The tab itself: welded to the edge (rounded only on the side
+          facing the page, flush and borderless on the side facing off
+          -screen) so it reads as part of the screen's own edge, not a
+          button floating over the content - a spring easing on hover
+          bulges it and pulls it a few pixels further out, the same
+          "grab me" cue as the reference's peeling QR corner. Hidden while
+          the panel itself is open rather than turned into a close button,
+          since the panel already has its own. */}
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open chat"
+          className="group fixed z-50 right-0 top-1/2 -translate-y-1/2 flex items-center justify-center h-16 w-11 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-[transform,width] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-x-1 hover:w-14 active:scale-95"
+        >
+          <MessageCircle className="size-5 -translate-x-0.5 transition-transform duration-300 group-hover:scale-110" />
+          {pendingCount ? (
+            <span
+              className="absolute top-1 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
+              style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
+            >
+              {pendingCount}
+            </span>
+          ) : null}
+        </button>
+      ) : null}
     </>,
     document.body
   );

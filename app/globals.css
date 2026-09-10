@@ -158,6 +158,17 @@ button, a { touch-action: manipulation; }
 @keyframes riseIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .rise { animation: riseIn 220ms cubic-bezier(.22,.61,.36,1) both; }
 
+/* The chat panel's own entrance: pulled out from the edge tab that opens
+   it, not faded up from below like everything else - see ChatWidget. Each
+   frame carries the panel's constant vertical centering (translateY(-50%))
+   alongside the horizontal slide, since a CSS animation's transform
+   replaces the element's own rather than combining with it. */
+@keyframes chatSlideIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(28px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+.chat-slide-in { animation: chatSlideIn 260ms cubic-bezier(.22,.61,.36,1) both; }
+
 /* One orchestrated reveal on load beats a dozen unrelated micro-animations.
    Children come in on a 40ms ladder, capped at eight so a long list never
    waits a third of a second for its tail. */
