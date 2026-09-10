@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, MessageCircle, Trash2, ExternalLink, Folder, FileText, Loader2, Send } from "lucide-react";
+import { Check, X, MessageCircle, Trash2, Folder, FileText, Loader2, Send } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import { driveThumbUrl } from "@/lib/api";
+import { DriveIcon } from "@/components/ui/drive-icon";
 import { FEEDBACK_REASONS } from "./reject-dialog";
 
 const REASON_LABEL = Object.fromEntries(FEEDBACK_REASONS.map((r) => [r.value, r.label]));
@@ -265,7 +266,7 @@ export function FileTile({
               aria-label="Open in Drive"
               className="p-1 -m-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             >
-              <ExternalLink className="size-4" />
+              <DriveIcon className="size-4" />
             </a>
           ) : null}
 
