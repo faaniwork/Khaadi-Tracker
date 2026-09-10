@@ -29,11 +29,13 @@ export async function POST(req) {
   const session = await auth();
   if (!session?.user?.email) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
   try {
-    const { text } = await req.json();
+    const { text, imageId, imageName } = await req.json();
     const message = await postChatMessage({
       email: session.user.email,
       name: session.user.name || session.user.email,
       text,
+      imageId,
+      imageName,
     });
     return NextResponse.json({ message });
   } catch (e) {

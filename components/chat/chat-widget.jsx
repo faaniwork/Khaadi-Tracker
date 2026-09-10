@@ -2,9 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, X, Send, Check, Users } from "lucide-react";
+import { MessageCircle, X, Send, Check, Users, ImagePlus, Loader2 } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
-import { fetchChatStatus, requestChatAccess, fetchChatMessages, sendChatMessage, grantChatAccess } from "@/lib/api";
+import {
+  fetchChatStatus,
+  requestChatAccess,
+  fetchChatMessages,
+  sendChatMessage,
+  grantChatAccess,
+  uploadChatImage,
+  chatImageUrl,
+} from "@/lib/api";
 
 const STATUS_POLL_MS = 20000;
 const MESSAGES_POLL_MS = 4000;
@@ -31,10 +39,14 @@ export function ChatWidget({ user }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState(null); // null when not uploading
+  const [dragOver, setDragOver] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const listRef = useRef(null);
+  const fileInputRef = useRef(null);
   const statusTimer = useRef(null);
   const messagesTimer = useRef(null);
+  const dragCounter = useRef(0);
 
   const loadStatus = useCallback(async () => {
     try {
@@ -106,6 +118,55 @@ export function ChatWidget({ user }) {
     }
   };
 
+  /**
+   * Uploads straight away rather than staging a preview to send later - one
+   * fewer step, and the caption (whatever is already typed) travels with it
+   * as the same message rather than a separate bubble.
+   */
+  const sendImage = async (file) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const caption = draft.trim();
+    setDraft("");
+    setUploadPct(0);
+    try {
+      const uploaded = await uploadChatImage({ file, onProgress: setUploadPct });
+      const { message } = await sendChatMessage({ text: caption, imageId: uploaded.id, imageName: uploaded.name });
+      setMessages((prev) => [...prev, message]);
+    } catch (e) {
+      setDraft(caption);
+    } finally {
+      setUploadPct(null);
+    }
+  };
+
+  const onFilePicked = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // same file picked twice in a row still fires change
+    if (file) sendImage(file);
+  };
+
+  const onDragEnter = (e) => {
+    e.preventDefault();
+    dragCounter.current += 1;
+    if (e.dataTransfer?.types?.includes("Files")) setDragOver(true);
+  };
+  const onDragOver = (e) => e.preventDefault();
+  const onDragLeave = (e) => {
+    e.preventDefault();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setDragOver(false);
+    }
+  };
+  const onDrop = (e) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) sendImage(file);
+  };
+
   const onGrant = async (email) => {
     try {
       await grantChatAccess({ targetEmail: email });
@@ -126,11 +187,16 @@ export function ChatWidget({ user }) {
     <>
       {open ? (
         <div
-          // Docked to the right edge and vertically centred, the same
-          // anchor the tab itself uses (see the trigger below) rather than
-          // a card floating free in a corner - flush on the right, rounded
-          // only where it faces the page.
-          className="fixed z-50 right-0 top-1/2 flex flex-col w-[min(360px,calc(100vw-2rem))] h-[min(520px,calc(100vh-4rem))] rounded-l-[20px] border border-r-0 border-border bg-card shadow-xl overflow-hidden chat-slide-in"
+          onDragEnter={status === "granted" ? onDragEnter : undefined}
+          onDragOver={status === "granted" ? onDragOver : undefined}
+          onDragLeave={status === "granted" ? onDragLeave : undefined}
+          onDrop={status === "granted" ? onDrop : undefined}
+          // Docked to the right edge near the bottom, the same anchor the
+          // tab itself uses (see the trigger below) - flush on the right,
+          // rounded only where it faces the page, so the panel reads as
+          // having been pulled out of the tab rather than a card floating
+          // free in a corner.
+          className="fixed z-50 right-0 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] md:bottom-24 flex flex-col w-[min(360px,calc(100vw-2rem))] h-[min(520px,calc(100vh-11rem))] rounded-l-[20px] border border-r-0 border-border bg-card shadow-xl overflow-hidden chat-slide-in"
         >
           <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border bg-secondary/40">
             <MessageCircle className="size-4 text-primary" />
@@ -178,7 +244,7 @@ export function ChatWidget({ user }) {
 
           {status === "granted" ? (
             <>
-              <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
+              <div ref={listRef} className="relative flex-1 min-h-0 overflow-y-auto scrollbar-thin px-4 py-3 flex flex-col gap-3">
                 {messages.length ? (
                   messages.map((m) => {
                     const mine = m.email === user?.email;
@@ -187,29 +253,69 @@ export function ChatWidget({ user }) {
                         <span className="text-[10px] text-muted-foreground mb-0.5">
                           {mine ? "You" : m.name || m.email} · {timeAgo(m.at)}
                         </span>
-                        <p
-                          className="max-w-[85%] rounded-2xl px-3 py-1.5 text-sm leading-snug break-words"
+                        <div
+                          className="max-w-[85%] rounded-2xl overflow-hidden"
                           style={
                             mine
                               ? { background: "var(--primary)", color: "var(--primary-foreground)" }
                               : { background: "var(--secondary)", color: "var(--foreground)" }
                           }
                         >
-                          {m.text}
-                        </p>
+                          {m.imageId ? (
+                            <a href={chatImageUrl({ fileId: m.imageId, size: 1600 })} target="_blank" rel="noopener noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={chatImageUrl({ fileId: m.imageId, size: 500 })}
+                                alt={m.imageName || "Shared image"}
+                                loading="lazy"
+                                className="block w-full max-h-64 object-cover"
+                              />
+                            </a>
+                          ) : null}
+                          {m.text ? <p className="px-3 py-1.5 text-sm leading-snug break-words">{m.text}</p> : null}
+                        </div>
                       </div>
                     );
                   })
                 ) : (
                   <p className="m-auto text-xs text-muted-foreground">No messages yet - say hello.</p>
                 )}
+
+                {/* Covers the message list only, not the whole panel, so the
+                    header and input stay put while a drag is in progress. */}
+                {dragOver ? (
+                  <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed text-sm font-semibold pointer-events-none" style={{ borderColor: "var(--primary)", background: "color-mix(in oklch, var(--primary) 10%, var(--card))", color: "var(--primary)" }}>
+                    <ImagePlus className="size-4" /> Drop to share
+                  </div>
+                ) : null}
               </div>
-              <form onSubmit={onSend} className="shrink-0 flex items-center gap-2 p-3 border-t border-border">
+
+              {uploadPct != null ? (
+                <div className="shrink-0 h-1 bg-secondary overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-[width] duration-150"
+                    style={{ width: `${Math.round(uploadPct * 100)}%` }}
+                  />
+                </div>
+              ) : null}
+
+              <form onSubmit={onSend} className="shrink-0 flex items-center gap-1.5 p-3 border-t border-border">
+                <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadPct != null}
+                  aria-label="Share an image"
+                  title="Share an image"
+                  className="size-9 shrink-0 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40"
+                >
+                  {uploadPct != null ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                </button>
                 <input
                   type="text"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Message…"
+                  placeholder="Message, or drop an image…"
                   disabled={busy}
                   className="flex-1 min-w-0 rounded-full border border-border bg-secondary/60 px-3.5 py-2 text-sm outline-none focus-visible:border-primary disabled:opacity-60"
                 />
@@ -217,7 +323,7 @@ export function ChatWidget({ user }) {
                   type="submit"
                   disabled={busy || !draft.trim()}
                   aria-label="Send"
-                  className="size-9 rounded-full grid place-items-center bg-primary text-primary-foreground disabled:opacity-40 transition-transform active:scale-95"
+                  className="size-9 shrink-0 rounded-full grid place-items-center bg-primary text-primary-foreground disabled:opacity-40 transition-transform active:scale-95"
                 >
                   <Send className="size-4" />
                 </button>
@@ -254,22 +360,24 @@ export function ChatWidget({ user }) {
       {/* The tab itself: welded to the edge (rounded only on the side
           facing the page, flush and borderless on the side facing off
           -screen) so it reads as part of the screen's own edge, not a
-          button floating over the content - a spring easing on hover
-          bulges it and pulls it a few pixels further out, the same
-          "grab me" cue as the reference's peeling QR corner. Hidden while
-          the panel itself is open rather than turned into a close button,
-          since the panel already has its own. */}
+          button floating over the content - a smooth, gentle ease on hover
+          bulges it and pulls it a couple pixels further out, the same
+          "grab me" cue as the reference's peeling QR corner. Anchored near
+          the bottom, clear of the phone's fixed tab bar below md the same
+          way the toast is (see components/toast.jsx). Hidden while the
+          panel itself is open rather than turned into a close button, since
+          the panel already has its own. */}
       {!open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open chat"
-          className="group fixed z-50 right-0 top-1/2 -translate-y-1/2 flex items-center justify-center h-16 w-11 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-[transform,width] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:-translate-x-1 hover:w-14 active:scale-95"
+          className="fixed z-50 right-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 flex items-center justify-center h-14 w-10 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-[transform,width] duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-x-1 hover:w-12 active:scale-95"
         >
-          <MessageCircle className="size-5 -translate-x-0.5 transition-transform duration-300 group-hover:scale-110" />
+          <MessageCircle className="size-5" />
           {pendingCount ? (
             <span
-              className="absolute top-1 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
+              className="absolute top-0.5 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
               style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
             >
               {pendingCount}
