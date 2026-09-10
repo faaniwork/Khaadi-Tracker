@@ -113,17 +113,25 @@ export function OutputView({
   canWrite = false,
   autoLatest = false,
   initialRelease = null,
+  initialDressId = null,
   onOpenBatchTools,
 }) {
+  // Landing on a specific dress — from an activity entry about feedback on
+  // one of its images. The dress row carries its own release and collection,
+  // so the whole trail can be opened from the id alone.
+  const landing = initialDressId ? rows.find((r) => String(r.id) === String(initialDressId)) : null;
   // `initialRelease` is how the sidebar and a batch card's "View collections"
   // land you straight inside a batch. The caller keys this component by that
   // release, so arriving at a different one remounts with it rather than
   // needing this state to be lifted and controlled from outside.
   const [release, setRelease] = useState(
-    () => initialRelease || (autoLatest ? sortedReleases(rows)[0] || null : null)
+    () =>
+      (landing ? landing.release || "Unsorted" : null) ||
+      initialRelease ||
+      (autoLatest ? sortedReleases(rows)[0] || null : null)
   );
-  const [collection, setCollection] = useState(null);
-  const [dress, setDress] = useState(null);
+  const [collection, setCollection] = useState(() => (landing ? landing.collection || "Unsorted" : null));
+  const [dress, setDress] = useState(() => landing || null);
   const [statusFilter, setStatusFilter] = useState("");
 
   // One filter, applied at every level: a release or collection still shows

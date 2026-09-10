@@ -623,6 +623,30 @@ export function Dashboard({ user }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  /**
+   * Follows an activity entry to where it happened. A dress target opens its
+   * images, which for a comment or a rejection is the actual thing the entry
+   * is about.
+   */
+  const onActivityJump = useCallback(
+    (target) => {
+      if (!target) return;
+      if (target.kind === "page") {
+        onNav(target.page);
+        return;
+      }
+      if (target.kind === "dress") {
+        setView({ page: "outputs", batch: target.release, dressId: target.dressId });
+      } else {
+        setView({ page: "outputs", batch: target.release, dressId: null });
+      }
+      setSearch("");
+      setStatusFilter("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [onNav]
+  );
+
   // ---------- derived data ----------
   const releases = useMemo(() => releasesPresent(rows), [rows]);
   const navItems = useMemo(() => {
@@ -800,18 +824,19 @@ export function Dashboard({ user }) {
               )}
             </>
           ) : view.page === "activity" ? (
-            <ActivityPage profiles={profiles} rows={rows} onNav={onNav} />
+            <ActivityPage profiles={profiles} rows={rows} onJump={onActivityJump} />
           ) : view.page === "access" ? (
             <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
           ) : view.page === "outputs" ? (
             <OutputView
               // Keyed by the batch so arriving at a different one starts at
               // that batch instead of wherever the last visit left off.
-              key={view.batch || "all"}
+              key={`${view.batch || "all"}:${view.dressId || ""}`}
               rows={rows}
               showToast={showToast}
               canWrite={canEdit}
               initialRelease={view.batch}
+              initialDressId={view.dressId}
               onOpenBatchTools={
                 canEdit ? (rel) => setView({ page: "batch", batch: rel }) : undefined
               }

@@ -98,32 +98,42 @@ function classify(entry) {
 }
 
 /**
- * Where clicking an entry should take you — the same board it changed,
- * resolved from the row/collection it names rather than a stored link,
- * since activity rows only ever recorded a scope string, never a place.
+ * Where clicking an entry should take you.
+ *
+ * Feedback — an approval, a rejection, a comment — is recorded against a
+ * FILE inside a dress, so landing on the batch and leaving you to find the
+ * dress yourself was most of the way to useless. Those now resolve to the
+ * dress itself, and the caller opens its images.
+ *
  * Returns null when there is nothing sensible to jump to (a bulk edit whose
- * scope is just a row count, a profile-picture change), and the row stays
+ * scope is just a row count, a profile-picture change) and the row stays
  * unclickable rather than pretending to lead somewhere.
  */
 function navTargetFor(entry, rows) {
   const scope = entry.scope || "";
-  const releaseOfRow = (id) => {
-    const row = rows?.find((r) => String(r.id) === String(id));
-    return row ? row.release || "Unsorted" : null;
-  };
-  const releaseOfCollection = (col) => {
-    const row = rows?.find((r) => (r.collection || "Unsorted") === col);
-    return row ? row.release || "Unsorted" : null;
+  const rowFor = (id) => rows?.find((r) => String(r.id) === String(id));
+  const releaseOf = (row) => (row ? row.release || "Unsorted" : null);
+
+  // A dress, opened at its images.
+  const dressTarget = (id) => {
+    const row = rowFor(id);
+    if (!row) return null;
+    return { kind: "dress", release: releaseOf(row), dressId: String(row.id), dress: row.dress };
   };
 
-  if (scope.startsWith("row:")) return releaseOfRow(scope.slice(4));
-  if (scope.startsWith("file:")) return releaseOfRow(scope.slice(5));
-  if (scope.startsWith("cost:release:")) return scope.slice("cost:release:".length);
-  if (scope.startsWith("cost:collection:")) return releaseOfCollection(scope.slice("cost:collection:".length));
-  if (scope.startsWith("note:")) return scope.slice(5) || null;
-  if (scope.startsWith("collection:")) return scope.slice(11) || null;
-  if (scope.startsWith("review-link:")) return scope.slice(12) || null;
-  if (scope.startsWith("access:")) return "access";
+  if (scope.startsWith("file:")) return dressTarget(scope.slice(5));
+  if (scope.startsWith("row:")) return dressTarget(scope.slice(4));
+
+  const releaseTarget = (release) => (release ? { kind: "release", release } : null);
+  if (scope.startsWith("cost:release:")) return releaseTarget(scope.slice("cost:release:".length));
+  if (scope.startsWith("cost:collection:")) {
+    const col = scope.slice("cost:collection:".length);
+    return releaseTarget(releaseOf(rows?.find((r) => (r.collection || "Unsorted") === col)));
+  }
+  if (scope.startsWith("note:")) return releaseTarget(scope.slice(5));
+  if (scope.startsWith("collection:")) return releaseTarget(scope.slice(11));
+  if (scope.startsWith("review-link:")) return releaseTarget(scope.slice(12));
+  if (scope.startsWith("access:")) return { kind: "page", page: "access" };
   return null;
 }
 
@@ -186,7 +196,7 @@ function ValueChange({ entry }) {
   );
 }
 
-export function ActivityPage({ profiles, rows, onNav }) {
+export function ActivityPage({ profiles, rows, onJump }) {
   const [entries, setEntries] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -307,17 +317,23 @@ export function ActivityPage({ profiles, rows, onNav }) {
               const Icon = kind.icon;
               const target = targetOf(e);
               const profile = lookup(e.by);
-              const navTarget = onNav ? navTargetFor(e, rows) : null;
+              const navTarget = onJump ? navTargetFor(e, rows) : null;
               const Row = navTarget ? "button" : "div";
               return (
                 <Row
                   key={e.id}
                   type={navTarget ? "button" : undefined}
-                  onClick={navTarget ? () => onNav(navTarget) : undefined}
+                  onClick={navTarget ? () => onJump(navTarget) : undefined}
                   className={`flex gap-3 py-2.5 border-b border-border last:border-0 w-full text-left ${
                     navTarget ? "cursor-pointer hover:bg-secondary/40 -mx-2 px-2 rounded-lg transition-colors" : ""
                   }`}
-                  title={navTarget ? "Jump to where this happened" : undefined}
+                  title={
+                    navTarget?.kind === "dress"
+                      ? `Open ${navTarget.dress || "this dress"}`
+                      : navTarget
+                        ? "Jump to where this happened"
+                        : undefined
+                  }
                 >
                   <div className="relative shrink-0">
                     <Avatar name={e.by} avatar={profile?.avatar} size={30} />
