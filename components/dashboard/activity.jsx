@@ -137,6 +137,32 @@ function navTargetFor(entry, rows) {
   return null;
 }
 
+/**
+ * Which batch (release) an entry belongs to, for the batch filter. Mirrors
+ * navTargetFor's own scope-sniffing rather than sharing code with it,
+ * because the two have different jobs: navTargetFor also has to know when
+ * NOT to be clickable, where this only needs a label to filter on and is
+ * fine falling back to null (shows up under "No batch" - profile edits,
+ * chat, anything that was never about one batch in the first place).
+ */
+function releaseFor(entry, rows) {
+  const scope = entry.scope || "";
+  const rowFor = (id) => rows?.find((r) => String(r.id) === String(id));
+  const releaseOfRow = (row) => (row ? row.release || "Unsorted" : null);
+
+  if (scope.startsWith("file:")) return releaseOfRow(rowFor(scope.slice(5)));
+  if (scope.startsWith("row:")) return releaseOfRow(rowFor(scope.slice(4)));
+  if (scope.startsWith("cost:release:")) return scope.slice("cost:release:".length);
+  if (scope.startsWith("cost:collection:")) {
+    const col = scope.slice("cost:collection:".length);
+    return releaseOfRow(rows?.find((r) => (r.collection || "Unsorted") === col));
+  }
+  if (scope.startsWith("note:")) return scope.slice(5);
+  if (scope.startsWith("collection:")) return scope.slice(11);
+  if (scope.startsWith("review-link:")) return scope.slice(12);
+  return null;
+}
+
 /** The human-readable target of the change. */
 function targetOf(entry) {
   const scope = entry.scope || "";
@@ -201,6 +227,8 @@ export function ActivityPage({ profiles, rows, onJump }) {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [kindFilter, setKindFilter] = useState("");
+  const [batchFilter, setBatchFilter] = useState("");
+  const [personFilter, setPersonFilter] = useState("");
 
   // Runs once on mount. State is only ever set inside the promise's
   // then/catch (never synchronously in the effect body), so there is no
@@ -239,9 +267,12 @@ export function ActivityPage({ profiles, rows, onJump }) {
   // interchangeable rows.
   const grouped = useMemo(() => {
     if (!entries) return [];
-    const filtered = kindFilter
-      ? entries.filter((e) => classify(e).label === kindFilter)
-      : entries;
+    const filtered = entries.filter((e) => {
+      if (kindFilter && classify(e).label !== kindFilter) return false;
+      if (batchFilter && (releaseFor(e, rows) || "No batch") !== batchFilter) return false;
+      if (personFilter && e.by !== personFilter) return false;
+      return true;
+    });
     const out = [];
     let currentDay = null;
     filtered.forEach((e) => {
@@ -253,11 +284,25 @@ export function ActivityPage({ profiles, rows, onJump }) {
       out[out.length - 1].items.push(e);
     });
     return out;
-  }, [entries, kindFilter]);
+  }, [entries, rows, kindFilter, batchFilter, personFilter]);
 
   const availableKinds = useMemo(() => {
     if (!entries) return [];
     return [...new Set(entries.map((e) => classify(e).label))].sort();
+  }, [entries]);
+
+  // "No batch" trails at the end rather than sorting alphabetically into the
+  // middle of the list - it is the catch-all, not a batch in its own right.
+  const availableBatches = useMemo(() => {
+    if (!entries) return [];
+    const set = new Set(entries.map((e) => releaseFor(e, rows) || "No batch"));
+    const named = [...set].filter((b) => b !== "No batch").sort();
+    return set.has("No batch") ? [...named, "No batch"] : named;
+  }, [entries, rows]);
+
+  const availablePeople = useMemo(() => {
+    if (!entries) return [];
+    return [...new Set(entries.map((e) => e.by))].sort();
   }, [entries]);
 
   const lookup = (name) => profiles?.byName?.[name];
@@ -268,7 +313,35 @@ export function ActivityPage({ profiles, rows, onJump }) {
         <ActivityIcon className="size-4 text-primary" />
         <h2 className="f-heading font-bold text-sm text-foreground">Activity</h2>
         <span className="text-xs text-muted-foreground">newest first</span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          {availableBatches.length > 1 ? (
+            <select
+              value={batchFilter}
+              onChange={(e) => setBatchFilter(e.target.value)}
+              className="rounded-[10px] border border-border bg-secondary/60 px-2 py-1.5 text-xs font-semibold text-foreground cursor-pointer outline-none focus-visible:border-primary"
+            >
+              <option value="">Every batch</option>
+              {availableBatches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          {availablePeople.length > 1 ? (
+            <select
+              value={personFilter}
+              onChange={(e) => setPersonFilter(e.target.value)}
+              className="rounded-[10px] border border-border bg-secondary/60 px-2 py-1.5 text-xs font-semibold text-foreground cursor-pointer outline-none focus-visible:border-primary"
+            >
+              <option value="">Everyone</option>
+              {availablePeople.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          ) : null}
           {availableKinds.length > 1 ? (
             <select
               value={kindFilter}
@@ -304,7 +377,9 @@ export function ActivityPage({ profiles, rows, onJump }) {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : !grouped.length ? (
         <p className="text-sm text-muted-foreground">
-          {kindFilter ? `No ${kindFilter} changes recorded.` : "No activity recorded yet."}
+          {kindFilter || batchFilter || personFilter
+            ? "Nothing matches that filter."
+            : "No activity recorded yet."}
         </p>
       ) : (
         grouped.map((group) => (
