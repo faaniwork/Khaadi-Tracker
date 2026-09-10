@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NewBatchDialog } from "@/components/dashboard/new-batch-dialog";
+import { ChatWidget } from "@/components/chat/chat-widget";
 
 const POLL_MS = 15000;
 const BATCHES_PER_PAGE = 9;
@@ -839,6 +840,7 @@ export function Dashboard({ user }) {
           <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
         </main>
         <Toast {...toast} />
+        <ChatWidget user={user} />
       </div>
     );
   }
@@ -903,6 +905,7 @@ export function Dashboard({ user }) {
               <OverviewStats
                 rows={rows}
                 totalCost={totalCost(costs)}
+                showCost={canEdit}
                 mascot={mascotState}
                 onMascotClick={onMascotClick}
               />
@@ -1107,6 +1110,7 @@ export function Dashboard({ user }) {
         onClose={() => setEditingProfile(false)}
       />
       <ConfettiCanvas />
+      <ChatWidget user={user} />
     </div>
   );
 }

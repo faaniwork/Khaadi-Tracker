@@ -59,7 +59,7 @@ function StatCell({ label, value, sub, colorVar, Icon, last }) {
   );
 }
 
-export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
+export function OverviewStats({ rows, totalCost, showCost = true, mascot, onMascotClick }) {
   const total = rows.length;
   const delivered = rows.filter((r) => r.status === "Delivered").length;
   const inProgress = rows.filter((r) => r.status === "In Progress").length;
@@ -79,18 +79,26 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
     { label: "Delivered", value: fmt(delivered), colorVar: "var(--good)", Icon: Sparkles },
     { label: "In Progress", value: fmt(inProgress), colorVar: "var(--info)", Icon: LayoutGrid },
     { label: "Needs Revision", value: fmt(revision), colorVar: "var(--warn)", Icon: ShieldAlert },
-    {
-      label: "Credit Cost",
-      value: fmt(totalCost),
-      sub: cpo != null ? `CPO ${fmt(cpo)}` : null,
-      colorVar: "var(--muted-foreground)",
-      Icon: Coins,
-    },
+    // Money is a team concern, not a viewer one - a client or a viewer
+    // reviewing images has no business seeing what the shoot cost.
+    ...(showCost
+      ? [
+          {
+            label: "Credit Cost",
+            value: fmt(totalCost),
+            sub: cpo != null ? `CPO ${fmt(cpo)}` : null,
+            colorVar: "var(--muted-foreground)",
+            Icon: Coins,
+          },
+        ]
+      : []),
   ];
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-5 rounded-[14px] border border-border bg-card overflow-hidden mb-7 rise">
+      <div
+        className={`grid grid-cols-2 ${showCost ? "lg:grid-cols-5" : "lg:grid-cols-4"} rounded-[14px] border border-border bg-card overflow-hidden mb-7 rise`}
+      >
         {cells.map((c, i) => (
           <StatCell key={c.label} {...c} last={i === cells.length - 1} />
         ))}
@@ -285,15 +293,19 @@ export function BatchCard({
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("release", rel, status, rr.length)} />
-        <CostInput
-          scope="release"
-          keyName={rel}
-          value={cost}
-          syncState={sync[`cost:release:${rel}`] || "idle"}
-          disabled={!canEdit}
-          onChange={onCostChange}
-          onRetry={() => onCostRetry("release", rel)}
-        />
+        {/* Cost is a team concern - hidden outright for a viewer or client,
+            not just disabled, same as the overview's own Credit Cost cell. */}
+        {canEdit ? (
+          <CostInput
+            scope="release"
+            keyName={rel}
+            value={cost}
+            syncState={sync[`cost:release:${rel}`] || "idle"}
+            disabled={!canEdit}
+            onChange={onCostChange}
+            onRetry={() => onCostRetry("release", rel)}
+          />
+        ) : null}
         <RevisionsSelect
           value={revisions || 0}
           disabled={!canEdit}
