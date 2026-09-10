@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# an old local recovery dump (11GB) sitting at the repo root - never meant
+# to be tracked, ignored outright so a future `git add -A` can't try to
+# stage it
+/_recovered/
