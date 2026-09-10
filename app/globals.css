@@ -139,7 +139,15 @@ body {
   font-family: var(--font-sans), -apple-system, sans-serif;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+  /* A tap on Safari mobile used to flash a grey rectangle over whatever was
+     pressed for a beat after the button's own :active state had already
+     finished - a distinctly "website", not "app", tell. */
+  -webkit-tap-highlight-color: transparent;
+  /* Scrolling the batch grid to its end used to rubber-band into dragging
+     the whole page with it, which reads as a browser tab, not a screen. */
+  overscroll-behavior-y: contain;
 }
+button, a { touch-action: manipulation; }
 .f-heading { font-family: var(--font-heading), sans-serif; }
 .f-mono { font-family: var(--font-mono), monospace; }
 

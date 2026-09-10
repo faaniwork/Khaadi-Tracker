@@ -1,5 +1,4 @@
 import { LayoutGrid, Ban } from "lucide-react";
-import { shortRelease } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 import { Logo } from "@/components/ui/logo";
 
@@ -138,10 +137,27 @@ export function Sidebar({ items, active, onNav }) {
   );
 }
 
-export function MobileNav({ items, active, onNav }) {
+/**
+ * The phone's primary navigation: a fixed bottom tab bar, the way a phone
+ * app is actually organised, rather than the sidebar's rail squeezed onto a
+ * scrolling top strip. That strip used to carry every batch as its own pill
+ * alongside Activity and Access, which is how the top of the screen ended up
+ * a horizontally-scrolling wall of chips - not something anyone opens a
+ * dashboard app expecting to navigate by.
+ *
+ * A handful of fixed destinations instead, the same ones the desktop header
+ * and sidebar's app-section already treat as top-level: Overview, Khaadi
+ * PDPs, Activity, and Access for an admin. Picking a batch happens by
+ * opening it from a card, same as tapping into an album rather than having
+ * every album pinned to a tab bar.
+ */
+export function MobileNav({ tabs, active, onNav }) {
   return (
-    <div className="md:hidden flex items-center gap-2 overflow-x-auto px-4 py-3 border-b border-border scrollbar-thin bg-card">
-      {items.map((it) => {
+    <nav
+      className="md:hidden fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-border bg-card/95 backdrop-blur"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      {tabs.map((it) => {
         const isActive = active.id === it.id;
         const Icon = it.icon;
         return (
@@ -149,20 +165,21 @@ export function MobileNav({ items, active, onNav }) {
             key={it.id}
             type="button"
             onClick={() => onNav(it.id)}
-            className={`rounded-xl f-heading text-xs font-bold px-3 py-1.5 shrink-0 whitespace-nowrap flex items-center gap-1.5 ${
-              isActive ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground border border-border"
-            } ${it.discarded && !isActive ? "line-through opacity-70" : ""}`}
-            style={
-              it.discarded && !isActive
-                ? { borderColor: "var(--destructive)", color: "var(--destructive)" }
-                : undefined
-            }
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] active:scale-95 transition-transform"
           >
-            {Icon ? <Icon className="size-3.5" /> : null}
-            {it.id === "overview" ? "All batches" : Icon ? it.label : shortRelease(it.id)}
+            <Icon
+              className="size-[22px]"
+              strokeWidth={isActive ? 2.4 : 2}
+              style={{ color: isActive ? "var(--foreground)" : "var(--muted-foreground)" }}
+            />
+            <span
+              className={`f-mono text-[10px] ${isActive ? "font-bold text-foreground" : "font-semibold text-muted-foreground"}`}
+            >
+              {it.label}
+            </span>
           </button>
         );
       })}
-    </div>
+    </nav>
   );
 }

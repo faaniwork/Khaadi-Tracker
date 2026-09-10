@@ -92,7 +92,10 @@ function ModeTabs({ mode, onNav }) {
     { id: "outputs", label: "Khaadi PDPs", nav: "outputs" },
   ];
   return (
-    <nav className="flex items-center gap-1 rounded-full bg-secondary/70 p-1">
+    // The phone's bottom tab bar already switches Dashboard/Khaadi PDPs (see
+    // MobileNav in nav.jsx) - keeping this pill here too just repeated the
+    // same choice in two different places on the same screen.
+    <nav className="hidden md:flex items-center gap-1 rounded-full bg-secondary/70 p-1">
       {tabs.map((t) => {
         const active = mode === t.id;
         return (

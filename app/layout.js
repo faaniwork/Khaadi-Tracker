@@ -24,6 +24,16 @@ export const metadata = {
   description: "Khaadi x ImagineArt PDP shoot — every batch, tracked live.",
 };
 
+// viewport-fit=cover is what makes env(safe-area-inset-*) resolve to a real
+// number instead of 0 on an iPhone - without it the fixed bottom tab bar
+// (see MobileNav in nav.jsx) would draw its safe-area padding as nothing and
+// sit flush under the home indicator.
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 const THEME_INIT = `try{var t=localStorage.getItem('khaadi-theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}`;
 
 export default function RootLayout({ children }) {

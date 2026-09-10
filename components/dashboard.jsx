@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter, RefreshCw } from "lucide-react";
+import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter, RefreshCw, LayoutGrid, Images } from "lucide-react";
 import { moodFor, mascotMessage, sortReleasesByRecency, RELEASE_LINKS, STATUS_OPTIONS } from "@/lib/constants";
 import {
   fetchBoard,
@@ -758,6 +758,22 @@ export function Dashboard({ user }) {
     if (role === "admin") items.push({ id: "access", label: "Access", icon: ShieldCheck });
     return items;
   }, [releases, rows, role]);
+  // The phone's bottom tab bar: a handful of fixed destinations rather than
+  // every batch pinned alongside them (see MobileNav in nav.jsx). Picking a
+  // batch happens from a card inside Overview or Khaadi PDPs, same as the
+  // desktop header's own Dashboard/Khaadi PDPs switch.
+  const mobileTabs = useMemo(() => {
+    const tabs = [
+      { id: "overview", label: "Overview", icon: LayoutGrid },
+      { id: "outputs", label: "Khaadi PDPs", icon: Images },
+      { id: "activity", label: "Activity", icon: Activity },
+    ];
+    if (role === "admin") tabs.push({ id: "access", label: "Access", icon: ShieldCheck });
+    return tabs;
+  }, [role]);
+  // A batch's own tools page (BatchPage) is reached FROM Khaadi PDPs, so it
+  // lights up the same tab rather than leaving none of them highlighted.
+  const mobileActiveId = view.page === "batch" ? "outputs" : view.page;
 
   const deliveredMood = moodFor(
     Math.min(100, (rows.filter((r) => r.status === "Delivered").length / 1000) * 100)
@@ -836,8 +852,8 @@ export function Dashboard({ user }) {
     // full width there, back to the framed panel from sm up.
     <div className="flex h-screen overflow-hidden bg-frame gap-0 p-0 sm:gap-2.5 sm:p-2.5">
       <Sidebar items={navItems} active={{ id: activeNavId }} onNav={onNav} />
+      <MobileNav tabs={mobileTabs} active={{ id: mobileActiveId }} onNav={onNav} />
       <div className="flex-1 min-w-0 flex flex-col min-h-0 rounded-none sm:rounded-[18px] border-0 sm:border border-border bg-background overflow-hidden">
-        <MobileNav items={navItems} active={{ id: activeNavId }} onNav={onNav} />
         <Header
           view={view}
           onNav={onNav}
@@ -860,10 +876,14 @@ export function Dashboard({ user }) {
             charts. On a phone that would leave no room for the cards at all,
             so there the whole page scrolls as before. */}
         <main
+          // Extra bottom clearance below md, where the fixed tab bar sits
+          // over the last inch of the page - pb-16 alone left its last card
+          // or button sitting half behind the bar on a phone with a home
+          // indicator eating into that space further still.
           className={`flex-1 min-h-0 flex flex-col w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pt-4 sm:pt-7 ${
             !searching && view.page === "overview"
-              ? "overflow-y-auto lg:overflow-hidden pb-16 lg:pb-0"
-              : "overflow-y-auto scrollbar-thin pb-16"
+              ? "overflow-y-auto lg:overflow-hidden pb-28 md:pb-16 lg:pb-0"
+              : "overflow-y-auto scrollbar-thin pb-28 md:pb-16"
           }`}
         >
           {searching ? (
