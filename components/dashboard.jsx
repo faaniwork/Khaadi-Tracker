@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter, RefreshCw, LayoutGrid, Images } from "lucide-react";
-import { moodFor, mascotMessage, sortReleasesByRecency, RELEASE_LINKS, STATUS_OPTIONS } from "@/lib/constants";
+import { moodFor, mascotMessage, MASCOT_LINES, sortReleasesByRecency, RELEASE_LINKS, STATUS_OPTIONS } from "@/lib/constants";
 import {
   fetchBoard,
   saveDressField,
@@ -131,6 +131,18 @@ export function Dashboard({ user }) {
   const [pendingBulk, setPendingBulk] = useState(null);
   const [addingBatch, setAddingBatch] = useState(false);
   const [mascot, setMascot] = useState({ active: false, message: "" });
+  // The idle flavour line shown when nobody has just clicked the mascot for
+  // a cheer. mascotMessage() itself uses Math.random(), so calling it
+  // straight in the render body (as this used to) picked a different line
+  // on the server than on the client's own first render - a guaranteed
+  // hydration mismatch (React error #418) on every single load, not a rare
+  // edge case. null here (server and first client render both see it, so
+  // they match) falls back to a fixed, deterministic line until the effect
+  // below swaps in a real random pick once hydration is safely behind it.
+  const [idleMessage, setIdleMessage] = useState(null);
+  const deliveredMood = moodFor(
+    Math.min(100, (rows.filter((r) => r.status === "Delivered").length / 1000) * 100)
+  );
   const [pendingDelete, setPendingDelete] = useState(null);
   const [checkingDrive, setCheckingDrive] = useState(false);
   const [releaseFolders, setReleaseFolders] = useState({});
@@ -271,6 +283,16 @@ export function Dashboard({ user }) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [loadData]);
+
+  useEffect(() => {
+    // Picks the actual random line only once hydration is safely behind us
+    // - see the idleMessage state declaration above for why this can't
+    // happen during render. Depends on the mood STRING, not on rows itself,
+    // so a poll refresh that leaves the mood unchanged doesn't re-roll the
+    // line out from under someone mid-read.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- client-only randomization; the deterministic fallback covers SSR and the first paint.
+    setIdleMessage(mascotMessage(deliveredMood));
+  }, [deliveredMood]);
 
   useEffect(() => {
     // Reads browser-only state (localStorage / matchMedia) to sync React's
@@ -806,13 +828,13 @@ export function Dashboard({ user }) {
   // lights up the same tab rather than leaving none of them highlighted.
   const mobileActiveId = view.page === "batch" ? "outputs" : view.page;
 
-  const deliveredMood = moodFor(
-    Math.min(100, (rows.filter((r) => r.status === "Delivered").length / 1000) * 100)
-  );
   const mascotState = {
     ...mascot,
     mood: mascot.mood || deliveredMood,
-    message: mascot.message || mascotMessage(deliveredMood),
+    // Deterministic fallback (first line for the mood) until the effect
+    // near the top of this component swaps in idleMessage post-hydration -
+    // see the idleMessage state declaration for why.
+    message: mascot.message || idleMessage || (MASCOT_LINES[deliveredMood] || MASCOT_LINES.eager)[0],
   };
 
   const failedKeys = Object.entries(sync).filter(([, v]) => v === "error").map(([k]) => k);
