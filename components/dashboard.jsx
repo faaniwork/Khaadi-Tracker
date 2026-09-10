@@ -10,6 +10,7 @@ import {
   saveBulkStatus,
   saveCost,
   saveNote,
+  saveReleaseRevisions,
   syncToSheet,
   renameCollection as renameCollectionApi,
   driveResync,
@@ -113,6 +114,7 @@ export function Dashboard({ user }) {
   const [addingBatch, setAddingBatch] = useState(false);
   const [mascot, setMascot] = useState({ active: false, message: "" });
   const [releaseFolders, setReleaseFolders] = useState({});
+  const [revisions, setRevisions] = useState({ batches: {} });
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -195,6 +197,7 @@ export function Dashboard({ user }) {
         setRole(data.role || "viewer");
         setDriveSync(data.driveSync || {});
         setReleaseFolders(data.releaseFolders || {});
+        setRevisions(data.revisions || { batches: {} });
         setLive(true);
         detectCelebrations(serverRows);
       } catch (e) {
@@ -471,6 +474,23 @@ export function Dashboard({ user }) {
     setPendingBulk(null);
     if (pending) applyBulkStatus(pending);
   }, [pendingBulk, applyBulkStatus]);
+
+  const onRevisionsChange = useCallback(
+    async (release, value) => {
+      const previous = revisions.batches[release] || 0;
+      setRevisions((prev) => ({ batches: { ...prev.batches, [release]: value } }));
+      try {
+        await saveReleaseRevisions({ release, value });
+        showToast(`${release}: ${value} revision${value === 1 ? "" : "s"}`);
+      } catch (e) {
+        // Put the old number back rather than leaving a value on screen that
+        // never reached the database.
+        setRevisions((prev) => ({ batches: { ...prev.batches, [release]: previous } }));
+        showToast(e.message || "Could not save that", "error");
+      }
+    },
+    [revisions, showToast]
+  );
 
   const onAddNote = useCallback(
     async (release, text) => {
@@ -795,12 +815,16 @@ export function Dashboard({ user }) {
                           colCount={Object.keys(cols).length}
                           noteCount={noteCount}
                           cost={costForRelease(costs, rel)}
+                          revisions={revisions.batches?.[rel] || 0}
+                          notes={notes.batches?.[rel]}
                           canEdit={canEdit}
                           sync={sync}
                           onNav={onNav}
                           onBulkStatus={requestBulkStatus}
                           onCostChange={onCostChange}
                           onCostRetry={retryCost}
+                          onRevisionsChange={onRevisionsChange}
+                          onAddNote={onAddNote}
                         />
                       );
                     })}

@@ -112,6 +112,16 @@
   --sidebar-border: oklch(1 0 0 / 0.1);
 }
 
+/* The mascot keeps the orange the rest of the interface gave up, and keeps it
+   in BOTH themes: it is a character, not chrome, so it should not invert when
+   the page does. Its face ink is fixed dark for the same reason — white eyes
+   in dark mode would make it a different creature. */
+:root, :root[data-theme="dark"] {
+  --mascot-from: oklch(0.665 0.195 41);
+  --mascot-to: oklch(0.79 0.155 68);
+  --mascot-ink: oklch(0.24 0.03 45);
+}
+
 * { border-color: var(--border); }
 body {
   background: var(--background);

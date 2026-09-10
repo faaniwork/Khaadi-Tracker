@@ -1,6 +1,11 @@
-import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, ChevronRight, Check, Ban } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, ChevronRight, Check, Ban, Repeat2 } from "lucide-react";
 import { fmt, shortRelease, MILESTONE_TARGET, RELEASE_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { MascotRider } from "@/components/mascot";
 import { DriveIcon } from "@/components/ui/drive-icon";
 import { BulkStatusControl } from "./status-select";
@@ -127,7 +132,103 @@ export function OverviewChart({ releases, rowsFor }) {
   );
 }
 
-export function BatchCard({ rel, driveLink, rr, colCount, noteCount, cost, canEdit, sync, onNav, onBulkStatus, onCostChange, onCostRetry }) {
+/**
+ * How many revision rounds this batch has been through. Zero by default,
+ * because most batches never need one and a default of 1 would quietly
+ * claim otherwise.
+ */
+function RevisionsSelect({ value, disabled, onChange }) {
+  return (
+    <label
+      className="flex items-center gap-1.5 rounded-[10px] border border-border bg-secondary/60 pl-2.5 pr-1 py-1"
+      title="Revision rounds for this batch"
+    >
+      <Repeat2 className="size-3.5 text-muted-foreground" />
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label="Revision rounds for this batch"
+        className="f-mono text-xs bg-transparent text-foreground outline-none cursor-pointer disabled:cursor-not-allowed pr-1"
+      >
+        {Array.from({ length: 10 }, (_, n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/**
+ * Why a batch went the way it did, on the card rather than a click away.
+ *
+ * The full thread lives in Batch tools; this shows the latest line and takes
+ * a new one, which is what someone glancing at the board actually needs —
+ * "why was this rejected" answered without navigating.
+ */
+function CardNotes({ list, canEdit, onAddNote }) {
+  const [text, setText] = useState("");
+  const notes = list || [];
+  const latest = notes[notes.length - 1];
+
+  const submit = () => {
+    const clean = text.trim();
+    if (!clean) return;
+    onAddNote(clean);
+    setText("");
+  };
+
+  return (
+    <div className="mt-4 pt-3 border-t border-border">
+      {latest ? (
+        <p className="text-xs text-muted-foreground leading-snug">
+          <span className="font-semibold text-foreground">{latest.by || "Someone"}:</span>{" "}
+          {latest.text}
+          {notes.length > 1 ? (
+            <span className="text-muted-foreground/70"> · {notes.length - 1} earlier</span>
+          ) : null}
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">No notes yet.</p>
+      )}
+      {canEdit ? (
+        <div className="flex items-center gap-1.5 mt-2">
+          <Input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && submit()}
+            placeholder="Why did this batch go this way?"
+            className="flex-1 min-w-0 text-xs py-1.5"
+          />
+          <Button variant="ghost" size="sm" onClick={submit} disabled={!text.trim()}>
+            Add
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function BatchCard({
+  rel,
+  driveLink,
+  rr,
+  colCount,
+  noteCount,
+  cost,
+  revisions,
+  notes,
+  canEdit,
+  sync,
+  onNav,
+  onBulkStatus,
+  onCostChange,
+  onCostRetry,
+  onRevisionsChange,
+  onAddNote,
+}) {
   const delivered = rr.filter((r) => r.status === "Delivered").length;
   const discarded = rr.filter((r) => r.status === "Discarded").length;
   const pct = rr.length ? (delivered / rr.length) * 100 : 0;
@@ -176,6 +277,11 @@ export function BatchCard({ rel, driveLink, rr, colCount, noteCount, cost, canEd
           onChange={onCostChange}
           onRetry={() => onCostRetry("release", rel)}
         />
+        <RevisionsSelect
+          value={revisions || 0}
+          disabled={!canEdit}
+          onChange={(n) => onRevisionsChange(rel, n)}
+        />
       </div>
       <div className="flex items-center gap-2 flex-wrap mt-3">
         <button
@@ -198,6 +304,7 @@ export function BatchCard({ rel, driveLink, rr, colCount, noteCount, cost, canEd
           </a>
         ) : null}
       </div>
+      <CardNotes list={notes} canEdit={canEdit} onAddNote={(text) => onAddNote(rel, text)} />
     </div>
   );
 }
