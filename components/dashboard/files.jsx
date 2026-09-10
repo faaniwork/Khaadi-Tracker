@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FolderPlus, RefreshCw, Loader2, Folder, Trash2, Undo2 } from "lucide-react";
+import { ArrowLeft, FolderPlus, RefreshCw, Loader2, Folder, Trash2, Undo2, Layers, Plus } from "lucide-react";
 import {
   driveList,
   driveUpload,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
+import { dressVersionNumber } from "@/lib/constants";
 import { FileTile } from "@/components/files/file-tile";
 import { RejectDialog } from "@/components/files/reject-dialog";
 import { Dropzone } from "@/components/files/dropzone";
@@ -44,6 +45,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   // trash, or create a folder.
   const reviewAllowed = canReview ?? canWrite;
   const [state, setState] = useState({ folderId: null, error: "", files: [], reviews: {}, comments: {} });
+  const [rootFiles, setRootFiles] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [trail, setTrail] = useState([]); // subfolders opened below the dress folder
   const [upload, setUpload] = useState({ active: false, progress: 0 });
@@ -58,11 +60,22 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const [creating, setCreating] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [version, setVersion] = useState(null); // null = the original set
+  const [addingVersion, setAddingVersion] = useState(false);
   const [bin, setBin] = useState(null); // null = closed, [] = open and empty
   const [binBusy, setBinBusy] = useState("");
 
-  const currentFolder = trail.length ? trail[trail.length - 1].id : dress.id;
-  const atRoot = trail.length === 0;
+  const currentFolder = version ? version.id : trail.length ? trail[trail.length - 1].id : dress.id;
+  const atRoot = !version && trail.length === 0;
+
+  // The revision rounds this dress has, newest last. Read from the dress
+  // folder's own listing, so they appear the moment one is created in Drive
+  // by hand as much as through the button.
+  const versions = (rootFiles || [])
+    .filter((f) => f.isFolder && dressVersionNumber(f.name) != null)
+    .map((f) => ({ ...f, n: dressVersionNumber(f.name) }))
+    .sort((a, b) => a.n - b.n);
+  const nextVersion = versions.length ? Math.max(...versions.map((v) => v.n)) + 1 : 2;
 
   // State is only ever written from the promise's then/catch, never
   // synchronously while the effect body runs, so opening a folder never
@@ -79,6 +92,9 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
             reviews: data.reviews || {},
             comments: data.comments || {},
           });
+          // Remembered from the dress folder itself, so the version switcher
+          // still knows what exists while you are inside V2.
+          if (folderId === dress.id) setRootFiles(data.files || []);
         })
         .catch((e) => {
           if (isStale?.()) return;
@@ -277,6 +293,31 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     }
   };
 
+  /**
+   * Starts the next revision round: creates V2 (or V3, V4...) inside the
+   * dress and switches straight into it, because the only reason to make one
+   * is to put the corrections in it.
+   */
+  const startVersion = async () => {
+    setAddingVersion(true);
+    try {
+      const res = await driveCreateFolder({
+        dressId: dress.id,
+        parentId: dress.id,
+        name: `V${nextVersion}`,
+      });
+      const folder = res?.folder || { id: res?.id, name: `V${nextVersion}` };
+      setRootFiles((prev) => [...prev, { ...folder, isFolder: true }]);
+      setTrail([]);
+      setVersion({ id: folder.id, name: `V${nextVersion}`, n: nextVersion });
+      showToast?.(`V${nextVersion} created - upload the corrected images here`, "ok");
+    } catch (e) {
+      showToast?.(e.message || "Could not create that version", "error");
+    } finally {
+      setAddingVersion(false);
+    }
+  };
+
   const createFolder = async (name, clear) => {
     setCreating(true);
     setFolderError("");
@@ -310,7 +351,12 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     if (statusFilter === "commented") return (state.comments[f.id] || []).length > 0;
     return (state.reviews[f.id]?.status || "pending") === statusFilter;
   };
-  const visibleFiles = state.files.filter((f) => f.isFolder || matchesFilter(f));
+  const visibleFiles = state.files.filter((f) => {
+    // A version folder is a tab, not a file. Leaving it in the grid meant a
+    // dress showed a mystery folder tile next to its images.
+    if (f.isFolder && !version && dressVersionNumber(f.name) != null) return false;
+    return f.isFolder || matchesFilter(f);
+  });
 
   return (
     <div className="rounded-[14px] border border-border bg-card p-5 mb-5 rise">
@@ -321,6 +367,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         <div className="min-w-0">
           <h3 className="f-heading font-bold text-base text-foreground truncate">
             {dress.dress}
+            {version ? <span className="text-muted-foreground"> / {version.name}</span> : null}
             {trail.length ? <span className="text-muted-foreground"> / {trail.map((t) => t.name).join(" / ")}</span> : null}
           </h3>
           <p className="text-xs text-muted-foreground">
@@ -362,6 +409,63 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         </div>
       </div>
 
+      {versions.length || canWrite ? (
+        <div className="flex items-center gap-1.5 flex-wrap mb-4 pb-4 border-b border-border">
+          <Layers className="size-3.5 text-muted-foreground" />
+          {/* The original is where you land, and it is the only complete set:
+              a revision round holds ONLY what was redone, so opening V2 first
+              would show three images and hide the other seventeen. */}
+          <button
+            type="button"
+            onClick={() => {
+              setVersion(null);
+              setTrail([]);
+            }}
+            className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+              !version
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Original
+          </button>
+          {versions.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => {
+                setTrail([]);
+                setVersion({ id: v.id, name: v.name, n: v.n });
+              }}
+              title={`Revision round ${v.n}`}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+                version?.id === v.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {v.name}
+            </button>
+          ))}
+          {canWrite ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={startVersion}
+              disabled={addingVersion}
+              title={`Create V${nextVersion} for the corrected images`}
+            >
+              <Plus className="size-3.5" /> {addingVersion ? "Creating" : `New version`}
+            </Button>
+          ) : null}
+          {version ? (
+            <span className="text-[11px] text-muted-foreground ml-1">
+              Corrections only. The full set is under Original.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {canWrite ? (
         <>
           <Dropzone
@@ -370,9 +474,11 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
             progress={upload.progress}
             onFiles={onFiles}
             hint={
-              atRoot
-                ? "They go straight into this dress's Drive folder."
-                : `They go into ${trail[trail.length - 1].name}.`
+              trail.length
+                ? `They go into ${trail[trail.length - 1].name}.`
+                : version
+                  ? `They go into ${version.name}, this dress's revision round ${version.n}.`
+                  : "They go straight into this dress's Drive folder."
             }
           />
           <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -491,7 +597,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         description={
           atRoot
             ? `Created inside ${dress.dress} in Drive.`
-            : `Created inside ${trail[trail.length - 1]?.name} in Drive.`
+            : `Created inside ${trail[trail.length - 1]?.name || version?.name} in Drive.`
         }
         label="Folder name"
         placeholder="e.g. Selects"
