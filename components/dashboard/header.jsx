@@ -3,7 +3,6 @@
 import { signOut } from "next-auth/react";
 import { Search, Sun, Moon, ArrowLeft, LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 
 const PAGE_TITLES = {
@@ -138,48 +137,62 @@ export function Header({
       <div className="w-full max-w-[1600px] mx-auto px-6 lg:px-10 flex items-center gap-3 h-14">
         <ModeTabs mode={mode} onNav={onNav} />
         <div className="ml-auto flex items-center gap-2">
+          {/* A bare green dot next to a search box was a pixel nobody could
+              interpret. It says what it means now, and only takes space
+              worth taking when something is actually wrong. */}
           <span
-            title={live ? "Synced with the Tracker sheet" : "Having trouble reaching the sheet"}
-            className="size-2.5 rounded-full shrink-0"
-            style={{ background: live ? "var(--good)" : "var(--destructive)" }}
-          />
+            title={live ? "Live: the board is in sync" : "Having trouble reaching the board"}
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[10.5px] font-semibold text-muted-foreground"
+          >
+            <span
+              className={`size-1.5 rounded-full ${live ? "animate-pulse" : ""}`}
+              style={{ background: live ? "var(--good)" : "var(--destructive)" }}
+            />
+            {live ? "Live" : "Offline"}
+          </span>
           {viewOnly ? (
-            <span className="f-mono text-[10.5px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg border border-border bg-secondary text-muted-foreground">
+            <span className="f-mono text-[10.5px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border border-border bg-secondary text-muted-foreground">
               View only
             </span>
           ) : null}
           {syncSummary ? (
-            <span
+            <button
+              type="button"
               onClick={syncSummary.onClick}
-              className="f-mono text-[10.5px] font-bold px-2 py-1 rounded-lg cursor-pointer border border-border"
+              className="f-mono text-[10.5px] font-bold px-2.5 py-1 rounded-full transition-transform hover:scale-[1.03]"
               style={{
                 background: syncSummary.kind === "error" ? "var(--destructive)" : "var(--warn)",
                 color: syncSummary.kind === "error" ? "var(--destructive-foreground)" : "var(--warn-foreground)",
               }}
             >
               {syncSummary.text}
-            </span>
+            </button>
           ) : null}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+
+          {/* Widens on focus, so it is out of the way until it is being
+              used and generous once it is. */}
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
             <Input
               type="text"
               value={search}
               onChange={(e) => onSearch(e.target.value)}
-              placeholder="Search dress, collection, batch…"
-              className="pl-9 pr-3 py-2 w-[220px]"
+              placeholder="Search dress, collection, batch"
+              className="pl-9 pr-3 py-1.5 rounded-full w-[190px] focus:w-[260px] transition-[width] duration-300 ease-out"
             />
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
+
+          <button
+            type="button"
             onClick={onToggleTheme}
             aria-label="Toggle light and dark mode"
             title="Toggle theme"
+            className="size-8 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </Button>
-          <div className="f-mono text-xs flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-xl border border-border bg-secondary/60">
+          </button>
+
+          <div className="flex items-center gap-2 pl-1 pr-1 py-1 rounded-full border border-border bg-secondary/50">
             <button
               type="button"
               onClick={onEditProfile}
@@ -189,14 +202,18 @@ export function Header({
             >
               <Avatar name={user?.name || user?.email} avatar={myAvatar} size={26} />
             </button>
-            <span className="font-semibold text-foreground max-w-[110px] truncate" title={user?.email}>
+            <span
+              className="hidden md:inline text-xs font-semibold text-foreground max-w-[110px] truncate"
+              title={user?.email}
+            >
               {user?.name || user?.email}
             </span>
             <button
               type="button"
               onClick={() => signOut()}
               title="Sign out"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Sign out"
+              className="size-7 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
             >
               <LogOut className="size-3.5" />
             </button>

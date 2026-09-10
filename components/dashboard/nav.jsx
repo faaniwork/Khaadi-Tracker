@@ -43,12 +43,25 @@ function NavButton({ it, isActive, onNav }) {
     <button
       type="button"
       onClick={() => onNav(it.id)}
+      aria-current={isActive ? "page" : undefined}
       title={it.discarded ? `${it.label} - all discarded` : it.label}
-      className="flex flex-col items-center gap-1 py-2 w-full rounded-xl transition-transform hover:-translate-y-px"
+      className={`relative flex flex-col items-center gap-1.5 py-2.5 w-full rounded-xl transition-colors duration-200 ${
+        isActive ? "bg-secondary" : "hover:bg-secondary/50"
+      }`}
     >
+      {/* Which batch you are looking at was carried entirely by a colour
+          change on a 9.5px label, which is to say it was not carried at all.
+          A filled pill and a bar on the sidebar's own edge say it from
+          across the room. */}
+      {isActive ? (
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-[3px] rounded-r-full bg-foreground"
+        />
+      ) : null}
       <NavRing id={it.id} pct={it.pct} icon={it.icon} discarded={it.discarded} />
       <span
-        className={`f-mono text-[9.5px] font-bold uppercase tracking-wide ${
+        className={`f-mono text-[9.5px] font-bold uppercase tracking-wide transition-colors ${
           isActive ? "text-foreground" : "text-muted-foreground"
         } ${it.discarded ? "line-through opacity-70" : ""}`}
       >
