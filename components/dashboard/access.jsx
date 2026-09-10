@@ -44,7 +44,7 @@ export function AccessPage({ role, currentEmail, showToast }) {
 
   if (!isAdmin) {
     return (
-      <div className="rounded-[20px] border border-border bg-card p-8 text-center text-sm text-muted-foreground rise">
+      <div className="rounded-[14px] border border-border bg-card p-8 text-center text-sm text-muted-foreground rise">
         Only admins can manage access. Ask an existing admin to add you here if you need this.
       </div>
     );
@@ -99,7 +99,7 @@ export function AccessPage({ role, currentEmail, showToast }) {
   };
 
   return (
-    <div className="rounded-[20px] border border-border bg-card p-5 rise">
+    <div className="rounded-[14px] border border-border bg-card p-5 rise">
       <div className="flex items-center gap-2 mb-4">
         <ShieldCheck className="size-4 text-primary" />
         <h2 className="f-heading font-bold text-sm text-foreground">Access &amp; roles</h2>

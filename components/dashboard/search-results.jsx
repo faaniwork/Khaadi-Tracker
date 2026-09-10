@@ -10,7 +10,7 @@ export function SearchResults({ rows, search, statusFilter, canEdit, sync, onFie
 
   if (!filtered.length) {
     return (
-      <div className="rounded-[20px] border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+      <div className="rounded-[14px] border border-border bg-card p-10 text-center text-sm text-muted-foreground">
         No dresses match — try a different search.
       </div>
     );
@@ -32,7 +32,7 @@ export function SearchResults({ rows, search, statusFilter, canEdit, sync, onFie
       <div key={rel} className="mb-5">
         <h2 className="f-heading font-bold text-sm mb-2 text-foreground">{rel}</h2>
         {Object.keys(cols).map((c) => (
-          <div key={c} className="rounded-[20px] border border-border bg-card mb-2.5 overflow-hidden">
+          <div key={c} className="rounded-[14px] border border-border bg-card mb-2.5 overflow-hidden">
             <div className="px-4 py-2.5 font-bold text-xs bg-secondary/40 text-foreground">{c}</div>
             <div className="overflow-x-auto scrollbar-thin">
               <table className="w-full border-collapse">

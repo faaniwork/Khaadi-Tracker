@@ -37,7 +37,7 @@ export function BatchPage({
   if (!rows.length) {
     return (
       <>
-        <div className="rounded-[20px] border border-border bg-card p-8 text-center text-sm mb-5 text-muted-foreground">
+        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-sm mb-5 text-muted-foreground">
           Nothing in this batch yet.
         </div>
         <NotesCard rel={rel} list={notesForBatch} canEdit={canEdit} onAddNote={onAddNote} />
@@ -55,7 +55,7 @@ export function BatchPage({
   return (
     <>
       <div
-        className="rounded-[20px] border border-border bg-card p-5 mb-5 rise"
+        className="rounded-[14px] border border-border bg-card p-5 mb-5 rise"
         style={allDiscarded ? { borderColor: "var(--destructive)" } : undefined}
       >
         <div className="flex items-start gap-4 flex-wrap">

@@ -20,7 +20,7 @@ export function SignIn() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm rounded-[20px] border border-border bg-card p-8 text-center rise">
+      <div className="w-full max-w-sm rounded-[14px] border border-border bg-card p-8 text-center rise">
         <Logo width={150} className="mb-6" />
         <h1 className="f-heading font-extrabold text-xl text-foreground">Production Board</h1>
         <Button className="mt-6 w-full" size="lg" onClick={onClick} disabled={submitting}>

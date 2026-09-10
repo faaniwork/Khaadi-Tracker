@@ -268,7 +268,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const visibleFiles = state.files.filter((f) => f.isFolder || matchesFilter(f));
 
   return (
-    <div className="rounded-[20px] border border-border bg-card p-5 mb-5 rise">
+    <div className="rounded-[14px] border border-border bg-card p-5 mb-5 rise">
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <Button variant="ghost" size="sm" onClick={onClose}>
           <ArrowLeft className="size-3.5" /> Back

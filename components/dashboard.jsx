@@ -748,7 +748,7 @@ export function Dashboard({ user }) {
               ) : null}
               {releases.length ? (
                 <>
-                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
                     {releases.slice(0, visibleBatches).map((rel) => {
                       const rr = rowsFor(rows, rel);
                       const cols = collectionsFor(rows, rel);
@@ -785,7 +785,7 @@ export function Dashboard({ user }) {
                   ) : null}
                 </>
               ) : (
-                <div className="rounded-[20px] border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+                <div className="rounded-[14px] border border-border bg-card p-10 text-center text-sm text-muted-foreground">
                   No batches yet.
                 </div>
               )}

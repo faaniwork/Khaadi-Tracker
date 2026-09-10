@@ -13,7 +13,7 @@ function BarRow({ label, pct, valueLabel }) {
       <div className="flex-1 rounded-full bg-muted overflow-hidden" style={{ height: 10 }}>
         <div
           className="h-full rounded-full transition-[width] duration-700"
-          style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--primary), var(--warn))" }}
+          style={{ width: `${pct}%`, background: "var(--primary)" }}
         />
       </div>
       <span className="f-mono text-xs font-semibold w-10 text-right shrink-0 text-muted-foreground">
@@ -25,17 +25,19 @@ function BarRow({ label, pct, valueLabel }) {
 
 function StatTile({ label, value, colorVar, Icon }) {
   return (
-    <div className="rounded-[20px] border border-border bg-card p-4 rise">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
-        <span
-          className="size-7 rounded-lg flex items-center justify-center"
-          style={{ background: `color-mix(in oklch, ${colorVar} 18%, transparent)`, color: colorVar }}
-        >
-          <Icon className="size-3.5" />
+    <div className="rounded-[14px] border border-border bg-card p-4 card-hover">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+          {label}
         </span>
+        {/* A bare glyph in its own colour, not a glyph in a tinted box. The
+            box was one more rounded rectangle per tile and it made five
+            tiles read as fifteen shapes. */}
+        <Icon className="size-4" style={{ color: colorVar }} />
       </div>
-      <div className="f-heading font-extrabold text-3xl text-foreground">{value}</div>
+      <div className="f-mono text-[30px] leading-none font-medium tracking-[-0.02em] text-foreground">
+        {value}
+      </div>
     </div>
   );
 }
@@ -50,7 +52,7 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6 stagger">
         <StatTile label="Total Dresses" value={fmt(total)} colorVar="var(--primary)" Icon={Shirt} />
         <StatTile label="Delivered" value={fmt(delivered)} colorVar="var(--good)" Icon={Sparkles} />
         <StatTile label="In Progress" value={fmt(inProgress)} colorVar="var(--info)" Icon={LayoutGrid} />
@@ -58,17 +60,20 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
         <StatTile label="Credit Cost" value={fmt(totalCost)} colorVar="var(--destructive)" Icon={Coins} />
       </div>
       <div className="mb-6" style={{ overflow: "visible" }}>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Road to 1,000 — {fmt(delivered)} of {fmt(MILESTONE_TARGET)} delivered
+        <div className="flex items-baseline justify-between mb-2.5">
+          <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+            Road to 1,000
           </span>
-          <span className="f-mono text-xs font-bold text-primary">{goalPct.toFixed(1)}%</span>
+          <span className="f-mono text-xs text-muted-foreground">
+            <span className="text-foreground font-medium">{fmt(delivered)}</span> of{" "}
+            {fmt(MILESTONE_TARGET)} · {goalPct.toFixed(1)}%
+          </span>
         </div>
         <div className="relative progress-zone" style={{ marginTop: 30 }}>
-          <div className="rounded-full bg-muted overflow-hidden" style={{ height: 12 }}>
+          <div className="rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
             <div
               className="h-full rounded-full transition-[width] duration-700"
-              style={{ width: `${goalPct}%`, background: "linear-gradient(90deg, var(--primary), var(--warn))" }}
+              style={{ width: `${goalPct}%`, background: "var(--primary)" }}
             />
           </div>
           <MascotRider
@@ -87,11 +92,8 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
 export function OverviewChart({ releases, rowsFor }) {
   if (!releases.length) return null;
   return (
-    <div className="rounded-[20px] border border-border bg-card p-5 mb-5 rise">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="size-4 text-destructive" />
-        <h2 className="f-heading font-bold text-sm text-foreground">Delivered % by batch</h2>
-      </div>
+    <div className="rounded-[14px] border border-border bg-card p-5 mb-5 rise">
+      <h2 className="f-heading text-sm font-semibold text-foreground mb-4">Delivered % by batch</h2>
       <div className="flex flex-col gap-2.5">
         {releases.map((rel) => {
           const rr = rowsFor(rel);
@@ -128,13 +130,13 @@ export function BatchCard({ rel, driveLink, rr, colCount, noteCount, cost, canEd
 
   return (
     <div
-      className="rounded-[20px] border border-border bg-card p-5 rise relative overflow-hidden card-hover transition-shadow"
+      className="rounded-[14px] border border-border bg-card p-5 relative overflow-hidden card-hover"
       style={allDiscarded ? { borderColor: "var(--destructive)" } : undefined}
     >
       <div className="flex items-center gap-4 mb-5">
         <Ring pct={allDiscarded ? 100 : pct} size={64} color={ringColor} label={ringLabel} />
         <div className="min-w-0">
-          <h3 className="f-heading font-bold text-lg leading-tight truncate text-foreground">{rel}</h3>
+          <h3 className="f-heading text-base font-semibold leading-tight truncate text-foreground">{rel}</h3>
           <p className="text-xs mt-0.5 text-muted-foreground">
             {colCount} collection{colCount === 1 ? "" : "s"} · {rr.length} dress{rr.length === 1 ? "" : "es"} · {delivered} delivered
             {noteCount ? ` · ${noteCount} note${noteCount === 1 ? "" : "s"}` : ""}

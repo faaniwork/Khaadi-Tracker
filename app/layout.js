@@ -1,23 +1,22 @@
-import { Manrope, Sora, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/providers";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+// One family doing both jobs, headings included. Geist's own weights carry
+// the hierarchy, which is why the reference dashboard reads as calm: nothing
+// changes typeface halfway down a card.
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const sora = Sora({
-  variable: "--font-sora",
+// Kept for the numbers. Tabular figures stop a live-updating count from
+// jittering as its digits change width.
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-});
-
-const jetbrains = JetBrains_Mono({
-  variable: "--font-jetbrains",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata = {
@@ -34,7 +33,7 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>
       <body
-        className={`${manrope.variable} ${sora.variable} ${jetbrains.variable} min-h-screen antialiased`}
+        className={`${geist.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
         <Providers>{children}</Providers>
       </body>

@@ -6,9 +6,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-manrope);
-  --font-heading: var(--font-sora);
-  --font-mono: var(--font-jetbrains);
+  --font-sans: var(--font-geist);
+  --font-heading: var(--font-geist);
+  --font-mono: var(--font-geist-mono);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -42,66 +42,74 @@
 }
 
 :root {
-  --background: oklch(0.985 0.004 293);
-  --foreground: oklch(0.22 0.035 290);
+  /* A near-monochrome ground, with WHITE-on-near-black (and its inverse) as
+     the accent instead of a colour. Colour is then free to mean something:
+     the only saturated things on screen are the four dress statuses and a
+     destructive action, so a batch needing revision is findable at a glance
+     rather than competing with tinted furniture. */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.035 290);
+  --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.035 290);
-  --primary: oklch(0.585 0.19 291);
-  --primary-foreground: oklch(0.99 0.005 291);
-  --secondary: oklch(0.955 0.012 291);
-  --secondary-foreground: oklch(0.30 0.05 291);
-  --muted: oklch(0.955 0.012 291);
-  --muted-foreground: oklch(0.52 0.03 288);
-  --accent: oklch(0.93 0.03 291);
-  --accent-foreground: oklch(0.30 0.05 291);
-  --destructive: oklch(0.6 0.21 25);
-  --destructive-foreground: oklch(0.99 0.005 25);
-  --border: oklch(0.90 0.014 291);
-  --input: oklch(0.90 0.014 291);
-  --ring: oklch(0.585 0.19 291 / 0.5);
-  --good: oklch(0.64 0.15 155);
-  --good-foreground: oklch(0.99 0 0);
-  --warn: oklch(0.78 0.15 80);
-  --warn-foreground: oklch(0.28 0.06 70);
-  --info: oklch(0.62 0.15 245);
-  --info-foreground: oklch(0.99 0 0);
-  --radius: 0.75rem;
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.22 0.035 290);
-  --sidebar-border: oklch(0.92 0.012 291);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --good: oklch(0.596 0.145 163);
+  --good-foreground: oklch(0.985 0 0);
+  --warn: oklch(0.705 0.153 74);
+  --warn-foreground: oklch(0.21 0.04 70);
+  --info: oklch(0.585 0.16 254);
+  --info-foreground: oklch(0.985 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-border: oklch(0.922 0 0);
 }
 
 :root[data-theme="dark"] {
-  --background: oklch(0.19 0.02 290);
-  --foreground: oklch(0.96 0.01 291);
-  --card: oklch(0.23 0.024 290);
-  --card-foreground: oklch(0.96 0.01 291);
-  --popover: oklch(0.23 0.024 290);
-  --popover-foreground: oklch(0.96 0.01 291);
-  --primary: oklch(0.72 0.16 291);
-  --primary-foreground: oklch(0.16 0.03 291);
-  --secondary: oklch(0.28 0.025 291);
-  --secondary-foreground: oklch(0.94 0.01 291);
-  --muted: oklch(0.27 0.022 291);
-  --muted-foreground: oklch(0.68 0.02 288);
-  --accent: oklch(0.30 0.03 291);
-  --accent-foreground: oklch(0.94 0.01 291);
-  --destructive: oklch(0.65 0.2 22);
-  --destructive-foreground: oklch(0.14 0.02 22);
-  --border: oklch(0.32 0.02 291);
-  --input: oklch(0.32 0.02 291);
-  --ring: oklch(0.72 0.16 291 / 0.5);
-  --good: oklch(0.72 0.16 155);
-  --good-foreground: oklch(0.14 0.02 155);
-  --warn: oklch(0.80 0.15 82);
-  --warn-foreground: oklch(0.18 0.03 80);
-  --info: oklch(0.72 0.14 245);
-  --info-foreground: oklch(0.14 0.02 245);
-  --sidebar: oklch(0.21 0.022 290);
-  --sidebar-foreground: oklch(0.96 0.01 291);
-  --sidebar-border: oklch(0.30 0.02 291);
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.205 0 0);
+  /* Hairlines rather than drawn borders: a translucent white reads as an
+     edge catching light on the panel below it, which is what keeps a dense
+     grid of cards from turning into a wireframe. */
+  --border: oklch(1 0 0 / 0.1);
+  --input: oklch(1 0 0 / 0.15);
+  --ring: oklch(0.556 0 0);
+  --good: oklch(0.723 0.153 163);
+  --good-foreground: oklch(0.205 0 0);
+  --warn: oklch(0.795 0.153 79);
+  --warn-foreground: oklch(0.205 0.03 70);
+  --info: oklch(0.685 0.155 253);
+  --info-foreground: oklch(0.205 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 0.1);
 }
 
 * { border-color: var(--border); }
@@ -115,9 +123,36 @@ body {
 .f-heading { font-family: var(--font-heading), sans-serif; }
 .f-mono { font-family: var(--font-mono), monospace; }
 
-@keyframes riseIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-.rise { animation: riseIn 380ms cubic-bezier(.2,.8,.2,1) both; }
-@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+/* Motion is deliberately quiet and short. A board someone stares at all day
+   should settle, not perform: 220ms and four pixels of travel reads as the
+   page arriving, where the old 380ms and six felt like every card was being
+   introduced. */
+@keyframes riseIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.rise { animation: riseIn 220ms cubic-bezier(.22,.61,.36,1) both; }
+
+/* One orchestrated reveal on load beats a dozen unrelated micro-animations.
+   Children come in on a 40ms ladder, capped at eight so a long list never
+   waits a third of a second for its tail. */
+.stagger > * { animation: riseIn 240ms cubic-bezier(.22,.61,.36,1) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 40ms; }
+.stagger > *:nth-child(3) { animation-delay: 80ms; }
+.stagger > *:nth-child(4) { animation-delay: 120ms; }
+.stagger > *:nth-child(5) { animation-delay: 160ms; }
+.stagger > *:nth-child(6) { animation-delay: 200ms; }
+.stagger > *:nth-child(7) { animation-delay: 240ms; }
+.stagger > *:nth-child(n+8) { animation-delay: 280ms; }
+
+/* Hover lifts by brightening the hairline rather than by casting a shadow.
+   On a near-black ground a drop shadow is invisible, so the old card-hover
+   shadow was doing nothing but costing a repaint. */
+.card-hover { transition: border-color 180ms ease, background-color 180ms ease; }
+.card-hover:hover { border-color: color-mix(in oklch, var(--foreground) 22%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise, .stagger > * { animation: none; }
+  .card-hover { transition: none; }
+}
 
 .sync-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: middle; background: transparent; transition: background .2s ease; }
 .sync-dot.sync-saving { background: var(--warn); animation: syncPulse 1s ease-in-out infinite; }

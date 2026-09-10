@@ -16,7 +16,7 @@ export function Crumb({ view, onBack }) {
   if (view.page === "overview") {
     return (
       <div>
-        <h1 className="f-heading font-extrabold text-2xl sm:text-[28px] leading-tight text-foreground">
+        <h1 className="f-heading text-xl sm:text-2xl font-semibold tracking-[-0.01em] leading-tight text-foreground">
           Production Board
         </h1>
         <p className="text-sm mt-0.5 text-muted-foreground">
@@ -41,7 +41,7 @@ export function Crumb({ view, onBack }) {
             <ArrowLeft className="size-4" /> All batches
           </button>
         ) : null}
-        <h1 className="f-heading font-extrabold text-2xl sm:text-[28px] leading-tight text-foreground">{title}</h1>
+        <h1 className="f-heading text-xl sm:text-2xl font-semibold tracking-[-0.01em] leading-tight text-foreground">{title}</h1>
         <p className="text-sm mt-0.5 text-muted-foreground">{sub}</p>
       </div>
     );
@@ -55,7 +55,7 @@ export function Crumb({ view, onBack }) {
       >
         <ArrowLeft className="size-4" /> All batches
       </button>
-      <h1 className="f-heading font-extrabold text-2xl sm:text-[28px] leading-tight text-foreground">
+      <h1 className="f-heading text-xl sm:text-2xl font-semibold tracking-[-0.01em] leading-tight text-foreground">
         {view.batch}
       </h1>
     </div>
@@ -80,7 +80,7 @@ function ModeTabs({ mode, onNav }) {
           key={t.id}
           type="button"
           onClick={() => onNav(t.nav)}
-          className={`f-heading text-sm sm:text-base font-bold pb-2.5 border-b-2 transition-colors ${
+          className={`f-heading text-sm font-medium pb-2.5 border-b-2 transition-colors ${
             mode === t.id ? "text-foreground" : "text-muted-foreground border-transparent hover:text-foreground"
           }`}
           style={mode === t.id ? { borderColor: "var(--primary)" } : undefined}
@@ -129,14 +129,14 @@ export function Header({
             style={{ background: live ? "var(--good)" : "var(--destructive)" }}
           />
           {viewOnly ? (
-            <span className="f-mono text-[10.5px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg border-[1.5px] border-border bg-secondary text-muted-foreground">
+            <span className="f-mono text-[10.5px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg border border-border bg-secondary text-muted-foreground">
               View only
             </span>
           ) : null}
           {syncSummary ? (
             <span
               onClick={syncSummary.onClick}
-              className="f-mono text-[10.5px] font-bold px-2 py-1 rounded-lg cursor-pointer border-[1.5px] border-border"
+              className="f-mono text-[10.5px] font-bold px-2 py-1 rounded-lg cursor-pointer border border-border"
               style={{
                 background: syncSummary.kind === "error" ? "var(--destructive)" : "var(--warn)",
                 color: syncSummary.kind === "error" ? "var(--destructive-foreground)" : "var(--warn-foreground)",
@@ -184,7 +184,7 @@ export function Header({
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
-          <div className="f-mono text-xs flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-xl border-[1.5px] border-border bg-secondary/60">
+          <div className="f-mono text-xs flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 rounded-xl border border-border bg-secondary/60">
             <button
               type="button"
               onClick={onEditProfile}

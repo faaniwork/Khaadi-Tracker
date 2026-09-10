@@ -253,7 +253,7 @@ export function ActivityPage({ profiles, rows, onNav }) {
   const lookup = (name) => profiles?.byName?.[name];
 
   return (
-    <div className="rounded-[20px] border border-border bg-card p-5 rise">
+    <div className="rounded-[14px] border border-border bg-card p-5 rise">
       <div className="flex items-center gap-2 flex-wrap mb-4">
         <ActivityIcon className="size-4 text-primary" />
         <h2 className="f-heading font-bold text-sm text-foreground">Activity</h2>

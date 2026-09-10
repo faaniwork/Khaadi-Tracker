@@ -9,7 +9,7 @@ import { StatusSelect, BulkStatusControl } from "./status-select";
 
 export function CostInput({ scope, keyName, value, syncState, disabled, onChange, onRetry }) {
   return (
-    <label className="flex items-center gap-1.5 f-mono text-xs px-2 py-1.5 rounded-lg border-[1.5px] border-border bg-secondary/60 text-muted-foreground">
+    <label className="flex items-center gap-1.5 f-mono text-xs px-2 py-1.5 rounded-lg border border-border bg-secondary/60 text-muted-foreground">
       <SyncDot state={syncState} onRetry={onRetry} title="Saved" />
       <Coins className="size-3.5" />
       {/* Shows blank rather than a literal 0 when no credits have been
@@ -123,7 +123,7 @@ export function CollectionCard({
   };
 
   return (
-    <div className="rounded-[20px] border border-border bg-card mb-3 overflow-hidden rise">
+    <div className="rounded-[14px] border border-border bg-card mb-3 overflow-hidden rise">
       <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 flex-wrap bg-secondary/40">
         <button
           type="button"
@@ -244,7 +244,7 @@ export function CollectionCard({
 export function NotesCard({ rel, list, canEdit, onAddNote }) {
   const items = (list || []).slice().reverse();
   return (
-    <div className="rounded-[20px] border border-border bg-card p-5 mb-5 rise">
+    <div className="rounded-[14px] border border-border bg-card p-5 mb-5 rise">
       <h3 className="f-heading font-bold text-sm mb-2 text-foreground">Notes on this batch</h3>
       <div className="mb-3">
         {items.length ? (
