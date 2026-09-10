@@ -205,7 +205,7 @@ function CardNotes({ list, canEdit, onAddNote }) {
   };
 
   return (
-    <div className="mt-4 pt-3 border-t border-border">
+    <div className="pt-3 border-t border-border">
       {latest ? (
         <p className="text-xs text-muted-foreground leading-snug">
           <span className="font-semibold text-foreground">{latest.by || "Someone"}:</span>{" "}
@@ -276,25 +276,53 @@ export function BatchCard({
     ""
   );
 
+  // The ring's own checkmark already says "fully delivered" - repeating the
+  // count right next to it ("13 dresses · 13 delivered") was saying the
+  // same thing twice. Only the dress count is worth keeping once the two
+  // numbers are identical; short of complete, the delivered count is real
+  // information the ring's bare percentage doesn't give you.
+  const meta = [
+    `${colCount} collection${colCount === 1 ? "" : "s"}`,
+    `${rr.length} dress${rr.length === 1 ? "" : "es"}`,
+    ...(complete ? [] : [`${delivered} delivered`]),
+    ...(noteCount ? [`${noteCount} note${noteCount === 1 ? "" : "s"}`] : []),
+  ].join(" · ");
+
   return (
     <div
-      className="rounded-[14px] border border-border bg-card p-5 relative overflow-hidden card-hover"
+      className="rounded-[14px] border border-border bg-card p-5 relative overflow-hidden card-hover flex flex-col gap-4"
       style={allDiscarded ? { borderColor: "var(--destructive)" } : undefined}
     >
-      <div className="flex items-center gap-4 mb-5">
-        <Ring pct={allDiscarded ? 100 : pct} size={64} color={ringColor} label={ringLabel} />
-        <div className="min-w-0">
-          <h3 className="f-heading text-base font-semibold leading-tight truncate text-foreground">{rel}</h3>
-          <p className="text-xs mt-0.5 text-muted-foreground">
-            {colCount} collection{colCount === 1 ? "" : "s"} · {rr.length} dress{rr.length === 1 ? "" : "es"} · {delivered} delivered
-            {noteCount ? ` · ${noteCount} note${noteCount === 1 ? "" : "s"}` : ""}
-          </p>
+      <div className="flex items-start gap-3.5">
+        <Ring pct={allDiscarded ? 100 : pct} size={56} color={ringColor} label={ringLabel} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="f-heading text-base font-semibold leading-tight truncate text-foreground">{rel}</h3>
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={() => onDelete(rel)}
+                title="Delete this batch"
+                aria-label={`Delete ${rel}`}
+                className="shrink-0 -mt-1 -mr-1 p-1.5 rounded-lg text-muted-foreground/60 hover:text-destructive transition-colors"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <p className="text-xs mt-1 text-muted-foreground leading-snug">{meta}</p>
         </div>
       </div>
+
+      {/* A bulk-set action has nothing to show a viewer who can't use it, so
+          it goes away rather than sitting there disabled - same for cost,
+          a team concern hidden outright elsewhere on this same card.
+          Revisions stays for everyone: unlike the other two it is a
+          reading, not just an action, and worth seeing even read-only. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("release", rel, status, rr.length)} />
-        {/* Cost is a team concern - hidden outright for a viewer or client,
-            not just disabled, same as the overview's own Credit Cost cell. */}
+        {canEdit ? (
+          <BulkStatusControl onPick={(status) => onBulkStatus("release", rel, status, rr.length)} />
+        ) : null}
         {canEdit ? (
           <CostInput
             scope="release"
@@ -312,7 +340,8 @@ export function BatchCard({
           onChange={(n) => onRevisionsChange(rel, n)}
         />
       </div>
-      <div className="flex items-center gap-2 flex-wrap mt-3">
+
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => onNav(rel)}
@@ -332,18 +361,8 @@ export function BatchCard({
             <DriveIcon className="size-4" />
           </a>
         ) : null}
-        {onDelete ? (
-          <button
-            type="button"
-            onClick={() => onDelete(rel)}
-            title="Delete this batch"
-            aria-label={`Delete ${rel}`}
-            className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        ) : null}
       </div>
+
       <CardNotes list={notes} canEdit={canEdit} onAddNote={(text) => onAddNote(rel, text)} />
     </div>
   );
