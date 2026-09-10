@@ -1,6 +1,7 @@
 import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, ChevronRight, Check, Ban } from "lucide-react";
 import { fmt, shortRelease, MILESTONE_TARGET, RELEASE_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
+import { MascotRider } from "@/components/mascot";
 import { DriveIcon } from "@/components/ui/drive-icon";
 import { BulkStatusControl } from "./status-select";
 import { CostInput } from "./dress-table";
@@ -48,12 +49,15 @@ function StatCell({ label, value, colorVar, Icon, last }) {
   );
 }
 
-export function OverviewStats({ rows, totalCost }) {
+export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
   const total = rows.length;
   const delivered = rows.filter((r) => r.status === "Delivered").length;
   const inProgress = rows.filter((r) => r.status === "In Progress").length;
   const revision = rows.filter((r) => r.status === "Needs Revision").length;
   const goalPct = Math.min(100, (delivered / MILESTONE_TARGET) * 100);
+  // Kept off the very ends of the track so the speech bubble never hangs off
+  // the side of the page.
+  const ridePct = Math.max(6, Math.min(94, goalPct));
 
   const cells = [
     { label: "Total Dresses", value: fmt(total), colorVar: "var(--muted-foreground)", Icon: Shirt },
@@ -73,7 +77,7 @@ export function OverviewStats({ rows, totalCost }) {
 
       {/* No card around this. It is one line of text and one bar; a border
           and a panel would be more furniture than content. */}
-      <div className="mb-8">
+      <div className="mb-8" style={{ overflow: "visible" }}>
         <div className="flex items-baseline justify-between mb-2.5">
           <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
             Road to 1,000
@@ -83,10 +87,23 @@ export function OverviewStats({ rows, totalCost }) {
             {fmt(MILESTONE_TARGET)} · {goalPct.toFixed(1)}%
           </span>
         </div>
-        <div className="rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
-          <div
-            className="h-full rounded-full transition-[width] duration-700"
-            style={{ width: `${goalPct}%`, background: "var(--primary)" }}
+        {/* The rider hangs off the top of the track, so the track needs its
+            own clearance below the label. It had 30px for a 42px mascot
+            before, which is precisely why the poor thing was sitting on top
+            of the words. */}
+        <div className="relative progress-zone mt-12">
+          <div className="rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
+            <div
+              className="h-full rounded-full transition-[width] duration-700"
+              style={{ width: `${goalPct}%`, background: "var(--primary)" }}
+            />
+          </div>
+          <MascotRider
+            mood={mascot?.mood}
+            message={mascot?.message}
+            active={mascot?.active}
+            leftPct={ridePct}
+            onClick={onMascotClick}
           />
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
 import { Activity, ShieldCheck, Sun, Moon, LogOut } from "lucide-react";
-import { sortReleasesByRecency, RELEASE_LINKS } from "@/lib/constants";
+import { moodFor, mascotMessage, sortReleasesByRecency, RELEASE_LINKS } from "@/lib/constants";
 import {
   fetchBoard,
   saveDressField,
@@ -111,6 +111,7 @@ export function Dashboard({ user }) {
   const [editingProfile, setEditingProfile] = useState(false);
   const [pendingBulk, setPendingBulk] = useState(null);
   const [addingBatch, setAddingBatch] = useState(false);
+  const [mascot, setMascot] = useState({ active: false, message: "" });
   const [releaseFolders, setReleaseFolders] = useState({});
 
   const dirtyRows = useRef(new Set());
@@ -119,6 +120,7 @@ export function Dashboard({ user }) {
   const lastUpdatedAt = useRef({});
   const inFlight = useRef(false);
   const pollTimer = useRef(null);
+  const mascotTimer = useRef(null);
   const toastTimer = useRef(null);
   const knownComplete = useRef(null);
   const knownHundred = useRef(null);
@@ -596,6 +598,19 @@ export function Dashboard({ user }) {
     [showToast, loadData]
   );
 
+  const onMascotClick = useCallback(
+    (e) => {
+      const rect = e.currentTarget.getBoundingClientRect();
+      burstConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2, 70);
+      const deliveredNow = rows.filter((r) => r.status === "Delivered").length;
+      const mood = moodFor(Math.min(100, (deliveredNow / 1000) * 100));
+      setMascot({ active: true, message: mascotMessage(mood), mood });
+      clearTimeout(mascotTimer.current);
+      mascotTimer.current = setTimeout(() => setMascot((m) => ({ ...m, active: false })), 2600);
+    },
+    [rows]
+  );
+
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
     else if (target === "activity" || target === "access" || target === "outputs") setView({ page: target, batch: null });
@@ -619,6 +634,15 @@ export function Dashboard({ user }) {
     if (role === "admin") items.push({ id: "access", label: "Access", icon: ShieldCheck });
     return items;
   }, [releases, rows, role]);
+
+  const deliveredMood = moodFor(
+    Math.min(100, (rows.filter((r) => r.status === "Delivered").length / 1000) * 100)
+  );
+  const mascotState = {
+    ...mascot,
+    mood: mascot.mood || deliveredMood,
+    message: mascot.message || mascotMessage(deliveredMood),
+  };
 
   const failedKeys = Object.entries(sync).filter(([, v]) => v === "error").map(([k]) => k);
   const savingCount = Object.values(sync).filter((s) => s === "saving").length;
@@ -718,7 +742,12 @@ export function Dashboard({ user }) {
             />
           ) : view.page === "overview" ? (
             <>
-              <OverviewStats rows={rows} totalCost={totalCost(costs)} />
+              <OverviewStats
+                rows={rows}
+                totalCost={totalCost(costs)}
+                mascot={mascotState}
+                onMascotClick={onMascotClick}
+              />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
               {releases.length ? (
                 <>

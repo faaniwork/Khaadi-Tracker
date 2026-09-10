@@ -66,7 +66,10 @@ export function Sidebar({ items, active, onNav }) {
   const appItems = items.filter((it) => it.icon);
 
   return (
-    <aside className="hidden md:flex flex-col items-center w-[84px] shrink-0 py-5 gap-1 border-r border-border sticky top-0 h-screen scrollbar-thin overflow-y-auto bg-card">
+    <aside
+      style={{ "--ring-hole": "var(--sidebar)" }}
+      className="hidden md:flex flex-col items-center w-[84px] shrink-0 py-5 gap-1 border-r border-border sticky top-0 h-screen scrollbar-thin overflow-y-auto bg-sidebar"
+    >
       <Logo width={64} className="mb-4" />
       <div className="flex flex-col items-center gap-1 flex-1 w-full px-2">
         {batchItems.map((it) => (

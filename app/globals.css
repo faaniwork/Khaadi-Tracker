@@ -42,73 +42,81 @@
 }
 
 :root {
-  /* A near-monochrome ground, with WHITE-on-near-black (and its inverse) as
-     the accent instead of a colour. Colour is then free to mean something:
-     the only saturated things on screen are the four dress statuses and a
-     destructive action, so a batch needing revision is findable at a glance
-     rather than competing with tinted furniture. */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --good: oklch(0.596 0.145 163);
-  --good-foreground: oklch(0.985 0 0);
-  --warn: oklch(0.705 0.153 74);
-  --warn-foreground: oklch(0.21 0.04 70);
-  --info: oklch(0.585 0.16 254);
-  --info-foreground: oklch(0.985 0 0);
+  /* Warm beige ground, white cards, ORANGE as the accent.
+     The orange is the Khaadi mark's own colour, so the accent finally agrees
+     with the logo sitting above it instead of ignoring it.
+     Beige also earns the cards their edges back: white-on-white needed a
+     border to exist at all, white-on-beige separates by itself and the
+     hairline becomes a refinement rather than a crutch. */
+  --background: oklch(0.958 0.014 84);
+  --foreground: oklch(0.205 0.012 62);
+  --card: oklch(0.995 0.004 85);
+  --card-foreground: oklch(0.205 0.012 62);
+  --popover: oklch(0.995 0.004 85);
+  --popover-foreground: oklch(0.205 0.012 62);
+  --primary: oklch(0.635 0.192 40);
+  --primary-foreground: oklch(0.995 0.004 85);
+  --secondary: oklch(0.928 0.014 84);
+  --secondary-foreground: oklch(0.28 0.02 55);
+  --muted: oklch(0.928 0.014 84);
+  --muted-foreground: oklch(0.505 0.016 68);
+  --accent: oklch(0.905 0.022 78);
+  --accent-foreground: oklch(0.28 0.02 55);
+  /* Pushed toward crimson, away from the accent. A destructive action and
+     the primary action must not be the same gesture in the same colour. */
+  --destructive: oklch(0.535 0.216 19);
+  --destructive-foreground: oklch(0.995 0.004 85);
+  --border: oklch(0.888 0.016 82);
+  --input: oklch(0.888 0.016 82);
+  --ring: oklch(0.635 0.192 40 / 0.45);
+  --good: oklch(0.585 0.135 157);
+  --good-foreground: oklch(0.995 0.004 85);
+  /* Yellow rather than amber, for the same reason as destructive: "Needs
+     Revision" sat at almost exactly the accent's hue and read as a button. */
+  --warn: oklch(0.775 0.145 90);
+  --warn-foreground: oklch(0.28 0.05 80);
+  --info: oklch(0.565 0.145 251);
+  --info-foreground: oklch(0.995 0.004 85);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar: oklch(0.978 0.01 85);
+  --sidebar-foreground: oklch(0.205 0.012 62);
+  --sidebar-border: oklch(0.888 0.016 82);
 }
 
 :root[data-theme="dark"] {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.205 0 0);
-  /* Hairlines rather than drawn borders: a translucent white reads as an
+  /* The same warmth carried into the dark: a near-black mixed toward brown
+     rather than a neutral one, so the orange reads as lit by the page
+     instead of pasted onto it. */
+  --background: oklch(0.168 0.008 58);
+  --foreground: oklch(0.968 0.008 85);
+  --card: oklch(0.216 0.01 58);
+  --card-foreground: oklch(0.968 0.008 85);
+  --popover: oklch(0.216 0.01 58);
+  --popover-foreground: oklch(0.968 0.008 85);
+  --primary: oklch(0.685 0.19 42);
+  --primary-foreground: oklch(0.185 0.012 50);
+  --secondary: oklch(0.272 0.012 58);
+  --secondary-foreground: oklch(0.968 0.008 85);
+  --muted: oklch(0.272 0.012 58);
+  --muted-foreground: oklch(0.712 0.014 78);
+  --accent: oklch(0.30 0.018 55);
+  --accent-foreground: oklch(0.968 0.008 85);
+  --destructive: oklch(0.652 0.206 21);
+  --destructive-foreground: oklch(0.185 0.012 50);
+  /* Hairlines rather than drawn borders: a translucent warm white reads as an
      edge catching light on the panel below it, which is what keeps a dense
      grid of cards from turning into a wireframe. */
   --border: oklch(1 0 0 / 0.1);
   --input: oklch(1 0 0 / 0.15);
-  --ring: oklch(0.556 0 0);
-  --good: oklch(0.723 0.153 163);
-  --good-foreground: oklch(0.205 0 0);
-  --warn: oklch(0.795 0.153 79);
-  --warn-foreground: oklch(0.205 0.03 70);
-  --info: oklch(0.685 0.155 253);
-  --info-foreground: oklch(0.205 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.685 0.19 42 / 0.5);
+  --good: oklch(0.715 0.145 158);
+  --good-foreground: oklch(0.185 0.012 50);
+  --warn: oklch(0.835 0.145 92);
+  --warn-foreground: oklch(0.22 0.04 80);
+  --info: oklch(0.665 0.14 250);
+  --info-foreground: oklch(0.185 0.012 50);
+  --sidebar: oklch(0.216 0.01 58);
+  --sidebar-foreground: oklch(0.968 0.008 85);
   --sidebar-border: oklch(1 0 0 / 0.1);
 }
 
@@ -163,13 +171,32 @@ body {
 .bounce { animation: logoBounce 600ms cubic-bezier(.34,1.56,.64,1); }
 
 .ring-chart { position: relative; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; flex: none; transition: transform 220ms cubic-bezier(.34,1.56,.64,1); }
-.ring-chart::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--card); }
+.ring-chart::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--ring-hole, var(--card)); }
 /* ::before paints an inner disc over the ring's contents, so anything meant
    to sit inside the ring has to be lifted above it. This used to name only
    `span`, which silently hid the Activity and Access nav icons, since those
    render as a bare <svg>. */
 .ring-chart > * { position: relative; z-index: 1; }
 .card-hover:hover .ring-chart { transform: scale(1.06); }
+
+.progress-zone { position: relative; }
+.mascot-rider { position: absolute; top: 0; transform: translate(-50%,-100%); z-index: 5; opacity: .18; transition: opacity 900ms ease; }
+.mascot-svg { width: 42px; height: 42px; display: block; filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.22)); animation: mascotBob 1.8s ease-in-out infinite; }
+@keyframes mascotBob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-6px) rotate(4deg); } }
+.mascot-btn { background: none; border: 0; padding: 0; cursor: pointer; display: block; transition: transform 200ms cubic-bezier(.34,1.56,.64,1); }
+.mascot-btn:hover, .mascot-btn:focus-visible { transform: scale(1.2) translateY(-5px); }
+.progress-zone:hover .mascot-rider, .mascot-rider:focus-within, .mascot-rider.is-active { opacity: 1; transition: opacity 220ms ease; }
+.mascot-rider:hover .mascot-svg, .mascot-rider:focus-within .mascot-svg { animation-duration: .5s; }
+.mascot-bubble {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; width: 172px; transform: translate(-50%,8px) scale(.85);
+  background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: 12px;
+  padding: 8px 11px; font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center; white-space: normal;
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.25); opacity: 0; pointer-events: none;
+  transition: opacity 120ms ease, transform 180ms cubic-bezier(.34,1.56,.64,1);
+}
+.mascot-bubble::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: var(--popover); }
+.mascot-rider:hover .mascot-bubble, .mascot-rider:focus-within .mascot-bubble, .mascot-bubble.is-shown { opacity: 1; transform: translate(-50%,0) scale(1); pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .mascot-svg { animation: none; } .mascot-rider { opacity: 1; transition: none; } }
 
 .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
