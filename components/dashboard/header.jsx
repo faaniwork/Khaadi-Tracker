@@ -1,7 +1,7 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { Search, Sun, Moon, ArrowLeft, LogOut, FileSpreadsheet } from "lucide-react";
+import { Search, Sun, Moon, ArrowLeft, LogOut, FileSpreadsheet, Plus } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -110,6 +110,8 @@ export function Header({
   sheetSyncing,
   myAvatar,
   onEditProfile,
+  canEdit,
+  onAddBatch,
 }) {
   const viewOnly = role !== "admin" && role !== "editor";
   const mode = view.page === "outputs" ? "outputs" : "dashboard";
@@ -155,14 +157,16 @@ export function Header({
               className="pl-9 pr-3 py-2 w-[220px]"
             />
           </div>
-          <Select value={statusFilter} onChange={(e) => onStatusFilter(e.target.value)}>
-            <option value="">All statuses</option>
-            <option>Not Started</option>
-            <option>In Progress</option>
-            <option>Delivered</option>
-            <option>Needs Revision</option>
-            <option>Discarded</option>
-          </Select>
+          {mode === "outputs" ? null : (
+            <Select value={statusFilter} onChange={(e) => onStatusFilter(e.target.value)}>
+              <option value="">All statuses</option>
+              <option>Not Started</option>
+              <option>In Progress</option>
+              <option>Delivered</option>
+              <option>Needs Revision</option>
+              <option>Discarded</option>
+            </Select>
+          )}
           {role === "admin" ? (
             <Button
               variant="ghost"
@@ -173,6 +177,11 @@ export function Header({
               title="Sync a snapshot to the Google Sheet"
             >
               <FileSpreadsheet className={`size-4 ${sheetSyncing ? "animate-pulse" : ""}`} />
+            </Button>
+          ) : null}
+          {canEdit && onAddBatch ? (
+            <Button size="sm" onClick={onAddBatch}>
+              <Plus className="size-3.5" /> Add batch
             </Button>
           ) : null}
           <Button

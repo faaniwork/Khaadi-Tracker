@@ -2,7 +2,6 @@ import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, ChevronRight, Check, B
 import { fmt, shortRelease, MILESTONE_TARGET, RELEASE_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 import { DriveIcon } from "@/components/ui/drive-icon";
-import { MascotRider } from "@/components/mascot";
 import { BulkStatusControl } from "./status-select";
 import { CostInput } from "./dress-table";
 
@@ -23,43 +22,58 @@ function BarRow({ label, pct, valueLabel }) {
   );
 }
 
-function StatTile({ label, value, colorVar, Icon }) {
+/**
+ * One reading in the summary strip.
+ *
+ * Not a card: five bordered boxes in a row read as five separate things to
+ * consider, when they are five readings OF ONE THING. They share a single
+ * border now and are separated by dividers, which is both quieter and
+ * honest about what they are.
+ */
+function StatCell({ label, value, colorVar, Icon, last }) {
   return (
-    <div className="rounded-[14px] border border-border bg-card p-4 card-hover">
+    <div
+      className={`p-4 border-b lg:border-b-0 border-border ${last ? "" : "lg:border-r"}`}
+    >
       <div className="flex items-center justify-between mb-3">
         <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
           {label}
         </span>
-        {/* A bare glyph in its own colour, not a glyph in a tinted box. The
-            box was one more rounded rectangle per tile and it made five
-            tiles read as fifteen shapes. */}
         <Icon className="size-4" style={{ color: colorVar }} />
       </div>
-      <div className="f-mono text-[30px] leading-none font-medium tracking-[-0.02em] text-foreground">
+      <div className="f-mono text-[28px] leading-none font-medium tracking-[-0.02em] text-foreground">
         {value}
       </div>
     </div>
   );
 }
 
-export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
+export function OverviewStats({ rows, totalCost }) {
   const total = rows.length;
   const delivered = rows.filter((r) => r.status === "Delivered").length;
   const inProgress = rows.filter((r) => r.status === "In Progress").length;
   const revision = rows.filter((r) => r.status === "Needs Revision").length;
   const goalPct = Math.min(100, (delivered / MILESTONE_TARGET) * 100);
-  const ridePct = Math.max(6, Math.min(94, goalPct));
+
+  const cells = [
+    { label: "Total Dresses", value: fmt(total), colorVar: "var(--muted-foreground)", Icon: Shirt },
+    { label: "Delivered", value: fmt(delivered), colorVar: "var(--good)", Icon: Sparkles },
+    { label: "In Progress", value: fmt(inProgress), colorVar: "var(--info)", Icon: LayoutGrid },
+    { label: "Needs Revision", value: fmt(revision), colorVar: "var(--warn)", Icon: ShieldAlert },
+    { label: "Credit Cost", value: fmt(totalCost), colorVar: "var(--muted-foreground)", Icon: Coins },
+  ];
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6 stagger">
-        <StatTile label="Total Dresses" value={fmt(total)} colorVar="var(--primary)" Icon={Shirt} />
-        <StatTile label="Delivered" value={fmt(delivered)} colorVar="var(--good)" Icon={Sparkles} />
-        <StatTile label="In Progress" value={fmt(inProgress)} colorVar="var(--info)" Icon={LayoutGrid} />
-        <StatTile label="Needs Revision" value={fmt(revision)} colorVar="var(--warn)" Icon={ShieldAlert} />
-        <StatTile label="Credit Cost" value={fmt(totalCost)} colorVar="var(--destructive)" Icon={Coins} />
+      <div className="grid grid-cols-2 lg:grid-cols-5 rounded-[14px] border border-border bg-card overflow-hidden mb-7 rise">
+        {cells.map((c, i) => (
+          <StatCell key={c.label} {...c} last={i === cells.length - 1} />
+        ))}
       </div>
-      <div className="mb-6" style={{ overflow: "visible" }}>
+
+      {/* No card around this. It is one line of text and one bar; a border
+          and a panel would be more furniture than content. */}
+      <div className="mb-8">
         <div className="flex items-baseline justify-between mb-2.5">
           <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
             Road to 1,000
@@ -69,19 +83,10 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
             {fmt(MILESTONE_TARGET)} · {goalPct.toFixed(1)}%
           </span>
         </div>
-        <div className="relative progress-zone" style={{ marginTop: 30 }}>
-          <div className="rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
-            <div
-              className="h-full rounded-full transition-[width] duration-700"
-              style={{ width: `${goalPct}%`, background: "var(--primary)" }}
-            />
-          </div>
-          <MascotRider
-            mood={mascot.mood}
-            message={mascot.message}
-            active={mascot.active}
-            leftPct={ridePct}
-            onClick={onMascotClick}
+        <div className="rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
+          <div
+            className="h-full rounded-full transition-[width] duration-700"
+            style={{ width: `${goalPct}%`, background: "var(--primary)" }}
           />
         </div>
       </div>
@@ -92,7 +97,7 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
 export function OverviewChart({ releases, rowsFor }) {
   if (!releases.length) return null;
   return (
-    <div className="rounded-[14px] border border-border bg-card p-5 mb-5 rise">
+    <div className="mb-8">
       <h2 className="f-heading text-sm font-semibold text-foreground mb-4">Delivered % by batch</h2>
       <div className="flex flex-col gap-2.5">
         {releases.map((rel) => {

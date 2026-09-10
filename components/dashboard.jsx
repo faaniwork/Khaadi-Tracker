@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus } from "lucide-react";
-import { moodFor, mascotMessage, FUN_MESSAGES, sortReleasesByRecency, RELEASE_LINKS } from "@/lib/constants";
+import { Activity, ShieldCheck, Sun, Moon, LogOut } from "lucide-react";
+import { sortReleasesByRecency, RELEASE_LINKS } from "@/lib/constants";
 import {
   fetchBoard,
   saveDressField,
@@ -102,7 +102,6 @@ export function Dashboard({ user }) {
   const [expandedCols, setExpandedCols] = useState(() => new Set());
   const [sync, setSync] = useState({});
   const [toast, setToast] = useState({ message: "", kind: "ok", visible: false });
-  const [mascot, setMascot] = useState({ active: false, message: "" });
   const [theme, setTheme] = useState("light");
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [visibleBatches, setVisibleBatches] = useState(BATCHES_PER_PAGE);
@@ -121,7 +120,6 @@ export function Dashboard({ user }) {
   const inFlight = useRef(false);
   const pollTimer = useRef(null);
   const toastTimer = useRef(null);
-  const mascotTimer = useRef(null);
   const knownComplete = useRef(null);
   const knownHundred = useRef(null);
 
@@ -494,20 +492,6 @@ export function Dashboard({ user }) {
     [canEdit, user, showToast]
   );
 
-  const onMascotClick = useCallback(
-    (e) => {
-      const rect = e.currentTarget.getBoundingClientRect();
-      burstConfetti(rect.left + rect.width / 2, rect.top + rect.height / 2, 70);
-      const deliveredNow = rows.filter((r) => r.status === "Delivered").length;
-      const mood = moodFor(Math.min(100, (deliveredNow / 1000) * 100));
-      const message = mascotMessage(mood);
-      setMascot({ active: true, message, mood });
-      clearTimeout(mascotTimer.current);
-      mascotTimer.current = setTimeout(() => setMascot((m) => ({ ...m, active: false })), 2600);
-    },
-    [rows]
-  );
-
   const onToggleCol = useCallback((key) => {
     setExpandedCols((prev) => {
       const next = new Set(prev);
@@ -636,11 +620,6 @@ export function Dashboard({ user }) {
     return items;
   }, [releases, rows, role]);
 
-  const deliveredMood = moodFor(
-    Math.min(100, (rows.filter((r) => r.status === "Delivered").length / 1000) * 100)
-  );
-  const mascotState = { ...mascot, mood: mascot.mood || deliveredMood, message: mascot.message || mascotMessage(deliveredMood) };
-
   const failedKeys = Object.entries(sync).filter(([, v]) => v === "error").map(([k]) => k);
   const savingCount = Object.values(sync).filter((s) => s === "saving").length;
   const retryAllFailed = useCallback(() => {
@@ -723,6 +702,8 @@ export function Dashboard({ user }) {
           sheetSyncing={sheetSyncing}
           myAvatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
           onEditProfile={() => setEditingProfile(true)}
+          canEdit={canEdit}
+          onAddBatch={() => setAddingBatch(true)}
         />
         <main className="flex-1 max-w-[1280px] w-full mx-auto px-5 sm:px-8 py-6 pb-16">
           {searching ? (
@@ -737,15 +718,8 @@ export function Dashboard({ user }) {
             />
           ) : view.page === "overview" ? (
             <>
-              <OverviewStats rows={rows} totalCost={totalCost(costs)} mascot={mascotState} onMascotClick={onMascotClick} />
+              <OverviewStats rows={rows} totalCost={totalCost(costs)} />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
-              {canEdit ? (
-                <div className="flex justify-end mb-4">
-                  <Button size="sm" onClick={() => setAddingBatch(true)}>
-                    <Plus className="size-3.5" /> Add a batch
-                  </Button>
-                </div>
-              ) : null}
               {releases.length ? (
                 <>
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 stagger">

@@ -66,11 +66,11 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide }) {
     <button
       type="button"
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-2xl text-left hover:-translate-y-0.5 transition-transform duration-200 ${
-        wide ? "aspect-[16/10]" : "aspect-[4/5]"
+      className={`group relative overflow-hidden rounded-[14px] text-left border border-border card-hover ${
+        wide ? "aspect-[4/3]" : "aspect-[4/5]"
       }`}
     >
-      <CoverThumb dressId={coverDressId} className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+      <CoverThumb dressId={coverDressId} className="absolute inset-0 size-full object-cover object-top" />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
       {badge ? (
         <span
@@ -151,13 +151,15 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
   );
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div>
       <div className="flex items-center gap-1.5 flex-wrap mb-5 text-sm">
-        {crumb("Khaadi PDPs", () => {
-          setRelease(null);
-          setCollection(null);
-          setDress(null);
-        })}
+        {release ? (
+          crumb("All batches", () => {
+            setRelease(null);
+            setCollection(null);
+            setDress(null);
+          })
+        ) : null}
         {release ? (
           <>
             <ChevronRight className="size-3.5 text-muted-foreground" />
@@ -212,7 +214,7 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
           onClose={() => setDress(null)}
         />
       ) : collection ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 stagger">
           {collectionRows.map((r) => (
             <CoverTile
               key={r.id}
@@ -228,7 +230,7 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
           ) : null}
         </div>
       ) : release ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
           {Object.keys(collections).map((col) => {
             const colRows = collections[col];
             const delivered = colRows.filter((r) => r.status === "Delivered").length;
@@ -245,7 +247,7 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
           })}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
           {releases.map((rel) => {
             const rr = rows.filter((r) => (r.release || "Unsorted") === rel && matches(r));
             const delivered = rr.filter((r) => r.status === "Delivered").length;
