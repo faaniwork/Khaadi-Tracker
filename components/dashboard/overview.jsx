@@ -36,7 +36,7 @@ function BarRow({ label, pct, valueLabel }) {
  * border now and are separated by dividers, which is both quieter and
  * honest about what they are.
  */
-function StatCell({ label, value, colorVar, Icon, last }) {
+function StatCell({ label, value, sub, colorVar, Icon, last }) {
   return (
     <div
       className={`p-4 border-b lg:border-b-0 border-border ${last ? "" : "lg:border-r"}`}
@@ -47,8 +47,13 @@ function StatCell({ label, value, colorVar, Icon, last }) {
         </span>
         <Icon className="size-4" style={{ color: colorVar }} />
       </div>
-      <div className="f-mono text-[28px] leading-none font-medium tracking-[-0.02em] text-foreground">
-        {value}
+      <div className="flex items-baseline gap-2">
+        <div className="f-mono text-[28px] leading-none font-medium tracking-[-0.02em] text-foreground">
+          {value}
+        </div>
+        {/* Grayed out and small on purpose - this is the credit figure's own
+            footnote, not a reading of equal weight next to it. */}
+        {sub ? <span className="f-mono text-[11px] font-semibold text-muted-foreground">{sub}</span> : null}
       </div>
     </div>
   );
@@ -63,13 +68,24 @@ export function OverviewStats({ rows, totalCost, mascot, onMascotClick }) {
   // Kept off the very ends of the track so the speech bubble never hangs off
   // the side of the page.
   const ridePct = Math.max(6, Math.min(94, goalPct));
+  // Cost per outfit: what a delivered dress actually costs once the whole
+  // batch's credits are spread across it, not just the raw total anyone
+  // could already add up themselves. Null rather than 0 with nothing
+  // delivered yet, since dividing by zero delivered dresses is not "free."
+  const cpo = delivered ? Math.round(totalCost / delivered) : null;
 
   const cells = [
     { label: "Total Dresses", value: fmt(total), colorVar: "var(--muted-foreground)", Icon: Shirt },
     { label: "Delivered", value: fmt(delivered), colorVar: "var(--good)", Icon: Sparkles },
     { label: "In Progress", value: fmt(inProgress), colorVar: "var(--info)", Icon: LayoutGrid },
     { label: "Needs Revision", value: fmt(revision), colorVar: "var(--warn)", Icon: ShieldAlert },
-    { label: "Credit Cost", value: fmt(totalCost), colorVar: "var(--muted-foreground)", Icon: Coins },
+    {
+      label: "Credit Cost",
+      value: fmt(totalCost),
+      sub: cpo != null ? `CPO ${fmt(cpo)}` : null,
+      colorVar: "var(--muted-foreground)",
+      Icon: Coins,
+    },
   ];
 
   return (
