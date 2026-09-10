@@ -12,6 +12,7 @@ import { DressFiles } from "./files";
 
 export function BatchPage({
   rel,
+  driveLink,
   rows,
   collections,
   notesForBatch,
@@ -48,7 +49,7 @@ export function BatchPage({
   const pct = rows.length ? (delivered / rows.length) * 100 : 0;
   const complete = rows.length > 0 && delivered === rows.length;
   const allDiscarded = rows.length > 0 && discarded === rows.length;
-  const relLink = RELEASE_LINKS[rel];
+  const relLink = driveLink || RELEASE_LINKS[rel];
   const colKeys = Object.keys(collections);
 
   return (

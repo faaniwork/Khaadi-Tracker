@@ -103,11 +103,13 @@ export function OverviewChart({ releases, rowsFor }) {
   );
 }
 
-export function BatchCard({ rel, rr, colCount, noteCount, cost, canEdit, sync, onNav, onBulkStatus, onCostChange, onCostRetry }) {
+export function BatchCard({ rel, driveLink, rr, colCount, noteCount, cost, canEdit, sync, onNav, onBulkStatus, onCostChange, onCostRetry }) {
   const delivered = rr.filter((r) => r.status === "Delivered").length;
   const discarded = rr.filter((r) => r.status === "Discarded").length;
   const pct = rr.length ? (delivered / rr.length) * 100 : 0;
-  const relLink = RELEASE_LINKS[rel];
+  // driveLink is passed for batches created on the board, whose folder is
+  // recorded in the database rather than in the RELEASE_LINKS constant.
+  const relLink = driveLink || RELEASE_LINKS[rel];
   const complete = rr.length > 0 && delivered === rr.length;
   const allDiscarded = rr.length > 0 && discarded === rr.length;
 

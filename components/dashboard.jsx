@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Sun, Moon, LogOut } from "lucide-react";
-import { moodFor, mascotMessage, FUN_MESSAGES, sortReleasesByRecency } from "@/lib/constants";
+import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus } from "lucide-react";
+import { moodFor, mascotMessage, FUN_MESSAGES, sortReleasesByRecency, RELEASE_LINKS } from "@/lib/constants";
 import {
   fetchBoard,
   saveDressField,
@@ -14,6 +14,7 @@ import {
   renameCollection as renameCollectionApi,
   driveResync,
   fetchProfiles,
+  createBatch,
 } from "@/lib/api";
 import { burstConfetti } from "@/lib/confetti-bus";
 import { ConfettiCanvas } from "@/components/confetti-canvas";
@@ -28,7 +29,9 @@ import { ProfileDialog } from "@/components/dashboard/profile-dialog";
 import { AccessPage } from "@/components/dashboard/access";
 import { OutputView } from "@/components/dashboard/output-view";
 import { Logo } from "@/components/ui/logo";
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { NewBatchDialog } from "@/components/dashboard/new-batch-dialog";
 
 const POLL_MS = 15000;
 const BATCHES_PER_PAGE = 9;
@@ -67,6 +70,17 @@ function batchStats(rows, rel) {
     allDiscarded: rr.length > 0 && discarded === rr.length,
   };
 }
+/**
+ * A batch's Drive folder link. RELEASE_LINKS only covers the batches that
+ * predate the releases table, so a batch created on the board is looked up
+ * there first.
+ */
+function driveLinkFor(rel, releaseFolders) {
+  const folderId = releaseFolders?.[rel]?.folderId;
+  if (folderId) return `https://drive.google.com/drive/folders/${folderId}`;
+  return RELEASE_LINKS[rel] || "";
+}
+
 function costForRelease(costs, rel) {
   return Number(costs.batches?.[rel]) || 0;
 }
@@ -97,6 +111,8 @@ export function Dashboard({ user }) {
   const [profiles, setProfiles] = useState({ byEmail: {}, byName: {} });
   const [editingProfile, setEditingProfile] = useState(false);
   const [pendingBulk, setPendingBulk] = useState(null);
+  const [addingBatch, setAddingBatch] = useState(false);
+  const [releaseFolders, setReleaseFolders] = useState({});
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -178,6 +194,7 @@ export function Dashboard({ user }) {
         setNotes(data.notes || { batches: {} });
         setRole(data.role || "viewer");
         setDriveSync(data.driveSync || {});
+        setReleaseFolders(data.releaseFolders || {});
         setLive(true);
         detectCelebrations(serverRows);
       } catch (e) {
@@ -565,6 +582,36 @@ export function Dashboard({ user }) {
     [resyncing, showToast, loadData]
   );
 
+  /**
+   * Builds a new batch's folders in Drive, then reads them straight back.
+   *
+   * The resync is a separate request on purpose — creating ~40 folders and
+   * then walking the whole tree back is two jobs' worth of Drive calls, and
+   * putting them in one request risks a timeout taking the folder creation
+   * down with it. If this resync fails the folders still exist, and the
+   * batch's own "Resync from Drive" button picks them up.
+   */
+  const onCreateBatch = useCallback(
+    async ({ name, date, collections }) => {
+      const res = await createBatch({ name, date, collections });
+      setAddingBatch(false);
+      showToast(
+        `Created ${res.dresses} dress folder${res.dresses === 1 ? "" : "s"} in ${name} — reading them back…`,
+        "ok"
+      );
+      try {
+        await driveResync({ release: name });
+      } catch (e) {
+        console.error("resync after create failed", e);
+        showToast(`Folders created, but reading them back failed: ${e.message}`, "error");
+      }
+      await loadData(true);
+      setView({ page: "batch", batch: name });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [showToast, loadData]
+  );
+
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
     else if (target === "activity" || target === "access" || target === "outputs") setView({ page: target, batch: null });
@@ -692,6 +739,13 @@ export function Dashboard({ user }) {
             <>
               <OverviewStats rows={rows} totalCost={totalCost(costs)} mascot={mascotState} onMascotClick={onMascotClick} />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
+              {canEdit ? (
+                <div className="flex justify-end mb-4">
+                  <Button size="sm" onClick={() => setAddingBatch(true)}>
+                    <Plus className="size-3.5" /> Add a batch
+                  </Button>
+                </div>
+              ) : null}
               {releases.length ? (
                 <>
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -703,6 +757,7 @@ export function Dashboard({ user }) {
                         <BatchCard
                           key={rel}
                           rel={rel}
+                          driveLink={driveLinkFor(rel, releaseFolders)}
                           rr={rr}
                           colCount={Object.keys(cols).length}
                           noteCount={noteCount}
@@ -744,6 +799,7 @@ export function Dashboard({ user }) {
           ) : (
             <BatchPage
               rel={view.batch}
+              driveLink={driveLinkFor(view.batch, releaseFolders)}
               rows={rowsFor(rows, view.batch)}
               collections={collectionsFor(rows, view.batch)}
               notesForBatch={notes.batches?.[view.batch]}
@@ -768,6 +824,11 @@ export function Dashboard({ user }) {
         </main>
       </div>
 
+      <NewBatchDialog
+        open={addingBatch}
+        onClose={() => setAddingBatch(false)}
+        onCreate={onCreateBatch}
+      />
       <ConfirmDialog
         open={Boolean(pendingBulk)}
         title={
