@@ -132,6 +132,12 @@ html, body {
      is the backstop: nothing on this app is meant to be reached by swiping
      right, so nothing gets to force that scrollbar into existing. */
   overflow-x: hidden;
+  /* Belt-and-suspenders alongside the maximumScale/userScalable viewport
+     meta in app/layout.js: some browsers (Firefox on Android, notably)
+     ignore user-scalable=no outright as an accessibility policy, and
+     touch-action is the one thing that still stops a double-tap from
+     zooming there. Pans and single-finger scrolling are untouched. */
+  touch-action: manipulation;
 }
 body {
   background: var(--background);

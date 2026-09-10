@@ -28,9 +28,22 @@ export const metadata = {
 // number instead of 0 on an iPhone - without it the fixed bottom tab bar
 // (see MobileNav in nav.jsx) would draw its safe-area padding as nothing and
 // sit flush under the home indicator.
+//
+// maximumScale/userScalable pin the page at its own zoom level. This is a
+// dashboard with its own layout, not a document someone pinches into to
+// read small text, and a stray double-tap or two-finger brush while
+// scrolling a phone was jerking the whole page in and out of a browser
+// zoom it never needed - the "unstable" feeling that made this not feel
+// like an app. Locking it is a real accessibility trade-off (someone who
+// relies on pinch-zoom to read small text loses that here), accepted
+// deliberately because every piece of text and every tap target in this
+// UI is already sized for its own screen rather than assuming zoom is
+// available to fix it after the fact.
 export const viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: "cover",
 };
 

@@ -121,6 +121,7 @@ export function Dashboard({ user }) {
   const [checkingDrive, setCheckingDrive] = useState(false);
   const [releaseFolders, setReleaseFolders] = useState({});
   const [revisions, setRevisions] = useState({ batches: {} });
+  const [clientView, setClientView] = useState("images"); // "images" | "activity" - a client's own two tabs
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -818,7 +819,32 @@ export function Dashboard({ user }) {
         <header className="flex items-center gap-3 px-4 sm:px-6 py-3.5 border-b border-border bg-card sticky top-0 z-10">
           <Logo width={40} />
           <span className="f-heading font-bold text-sm text-foreground">Khaadi PDPs</span>
-          <div className="ml-auto flex items-center gap-2">
+          {/* A client still tracks what has happened to their own images -
+              just not the team's own cost/credit/status bookkeeping, which
+              getActivityLog itself now refuses to send a client account in
+              the first place. Two tabs, not a sidebar, because a client's
+              whole world here is these two things. */}
+          <div className="ml-auto flex items-center gap-1 rounded-full border border-border bg-secondary/40 p-0.5">
+            <button
+              type="button"
+              onClick={() => setClientView("images")}
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                clientView === "images" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              Images
+            </button>
+            <button
+              type="button"
+              onClick={() => setClientView("activity")}
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                clientView === "activity" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+              }`}
+            >
+              Activity
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onToggleTheme}
@@ -837,7 +863,11 @@ export function Dashboard({ user }) {
           </div>
         </header>
         <main className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 py-5 sm:py-7">
-          <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
+          {clientView === "activity" ? (
+            <ActivityPage profiles={profiles} rows={rows} />
+          ) : (
+            <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
+          )}
         </main>
         <Toast {...toast} />
         <ChatWidget user={user} profiles={profiles} />
