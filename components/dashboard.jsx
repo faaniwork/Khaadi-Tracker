@@ -101,7 +101,21 @@ export function Dashboard({ user }) {
   const [notes, setNotes] = useState({ batches: {} });
   const [role, setRole] = useState("viewer");
   const [live, setLive] = useState(true);
-  const [view, setView] = useState({ page: "overview", batch: null });
+  // Restored from this tab's own session storage rather than defaulting to
+  // Overview every time, so a phone refresh (or the browser reopening a
+  // backgrounded tab) lands you back wherever you actually were - the
+  // dashboard, Khaadi PDPs, a specific batch - instead of bouncing you to
+  // the top of the app. Read lazily (not in an effect) so the very first
+  // render already has the right page instead of flashing Overview first.
+  const [view, setView] = useState(() => {
+    if (typeof window === "undefined") return { page: "overview", batch: null };
+    try {
+      const saved = sessionStorage.getItem("khaadi:view");
+      return saved ? JSON.parse(saved) : { page: "overview", batch: null };
+    } catch (e) {
+      return { page: "overview", batch: null };
+    }
+  });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedCols, setExpandedCols] = useState(() => new Set());
@@ -217,6 +231,18 @@ export function Dashboard({ user }) {
     },
     [detectCelebrations, showToast]
   );
+
+  // Keeps session storage in step with wherever navigation actually lands,
+  // so the lazy useState initializer above has something current to read
+  // back on the next reload.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("khaadi:view", JSON.stringify(view));
+    } catch (e) {
+      // Private browsing or a full quota just means refresh won't restore
+      // the page this once - not worth surfacing to anyone.
+    }
+  }, [view]);
 
   // Fetched once rather than on the board poll: avatars are a few kilobytes
   // each and almost never change, so re-sending them every 15 seconds would
@@ -940,7 +966,20 @@ export function Dashboard({ user }) {
                 onMascotClick={onMascotClick}
               />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
-              <div className="flex-1 min-h-0 flex flex-col rounded-[14px] border border-border bg-card/40 px-4 pt-3.5 pb-1 mb-1">
+              {/* lg:flex-1 lg:min-h-0 matches the inner scroll div below -
+                  both were meant to only take effect once the desktop
+                  layout stops the whole page from scrolling and hands
+                  scrolling to this box instead. Without the lg: prefix,
+                  mobile got flex-1/min-h-0 too: with no bounded height to
+                  fill, the flex algorithm shrank this box toward zero
+                  instead of sizing it to its own content, so its real
+                  height (and therefore how far the page could ever
+                  actually scroll) had nothing to do with the cards really
+                  rendered inside it - they were overflowing an
+                  effectively collapsed box the whole time, which is why
+                  no amount of bottom padding on the page ever reliably
+                  cleared the last card from behind the phone's tab bar. */}
+              <div className="lg:flex-1 lg:min-h-0 flex flex-col rounded-[14px] border border-border bg-card/40 px-4 pt-3.5 pb-1 mb-1">
               {/* No "Batches" heading - "Add batch" already says what this
                   section is without repeating itself, and Check Drive drops
                   to an icon since its tooltip already carries the meaning. */}
