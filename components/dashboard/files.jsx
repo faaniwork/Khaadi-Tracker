@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, FolderPlus, RefreshCw, Loader2, Folder } from "lucide-react";
+import { ArrowLeft, FolderPlus, RefreshCw, Loader2, Folder, Trash2, Undo2 } from "lucide-react";
 import {
   driveList,
   driveUpload,
   driveCreateFolder,
   driveTrashFile,
+  driveRemovedFiles,
+  driveRestoreFile,
   driveReview,
   driveComment,
 } from "@/lib/api";
@@ -54,6 +56,8 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const [creating, setCreating] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
+  const [bin, setBin] = useState(null); // null = closed, [] = open and empty
+  const [binBusy, setBinBusy] = useState("");
 
   const currentFolder = trail.length ? trail[trail.length - 1].id : dress.id;
   const atRoot = trail.length === 0;
@@ -235,6 +239,42 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     }
   };
 
+  /**
+   * The bin: files taken off the board that Drive would not let us trash, so
+   * they were parked in a "Removed" subfolder instead. Fetched only when
+   * opened — most dresses have never had anything removed and there is no
+   * reason to ask Drive about a folder that does not exist.
+   */
+  const openBin = async () => {
+    if (bin) {
+      setBin(null);
+      return;
+    }
+    setBinBusy("loading");
+    try {
+      const res = await driveRemovedFiles({ dressId: dress.id });
+      setBin(res.files || []);
+    } catch (e) {
+      showToast?.(e.message || "Could not read the bin", "error");
+    } finally {
+      setBinBusy("");
+    }
+  };
+
+  const recover = async (file) => {
+    setBinBusy(file.id);
+    try {
+      await driveRestoreFile({ dressId: dress.id, fileId: file.id });
+      setBin((prev) => (prev || []).filter((f) => f.id !== file.id));
+      showToast?.(`"${file.name}" is back in this dress`, "ok");
+      load(currentFolder);
+    } catch (e) {
+      showToast?.(e.message || "Could not restore that file", "error");
+    } finally {
+      setBinBusy("");
+    }
+  };
+
   const createFolder = async () => {
     const name = newFolder.trim();
     if (!name) return;
@@ -300,6 +340,17 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               <Folder className="size-3.5" /> Up
             </Button>
           ) : null}
+          {canWrite ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={openBin}
+              disabled={binBusy === "loading"}
+              title="Files removed from this dress, and a way to put them back"
+            >
+              <Trash2 className="size-3.5" /> {bin ? "Hide bin" : "Bin"}
+            </Button>
+          ) : null}
           <Button variant="ghost" size="sm" onClick={() => load(currentFolder)} disabled={loading}>
             <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
@@ -332,6 +383,39 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
             </Button>
           </div>
         </>
+      ) : null}
+
+      {bin ? (
+        <div className="mt-4 rounded-[14px] border border-border bg-secondary/40 p-3">
+          {!bin.length ? (
+            <p className="text-xs text-muted-foreground">Nothing has been removed from this dress.</p>
+          ) : (
+            <>
+              <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground mb-2">
+                Removed — {bin.length} file{bin.length === 1 ? "" : "s"}
+              </p>
+              {bin.map((f) => (
+                <div
+                  key={f.id}
+                  className="flex items-center gap-2 py-1.5 border-b border-border last:border-0"
+                >
+                  <span className="text-xs text-foreground truncate flex-1 min-w-0" title={f.name}>
+                    {f.name}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => recover(f)}
+                    disabled={binBusy === f.id}
+                    title="Put this file back in the dress"
+                  >
+                    <Undo2 className="size-3.5" /> {binBusy === f.id ? "Restoring…" : "Recover"}
+                  </Button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
       ) : null}
 
       {state.error ? (

@@ -146,6 +146,13 @@ export function FileTile({
           <button
             type="button"
             onClick={() => onOpenLightbox?.(file)}
+            // Warms the full-resolution image while the cursor is still on
+            // its way to the click, so opening it is usually instant. Costs
+            // nothing for anyone who never opens it.
+            onMouseEnter={() => {
+              const img = new Image();
+              img.src = driveThumbUrl({ fileId: file.id, dressId, size: 1600 });
+            }}
             aria-label={`View ${file.name} full screen`}
             className="absolute inset-0 size-full group"
           >
@@ -154,6 +161,7 @@ export function FileTile({
               src={driveThumbUrl({ fileId: file.id, dressId })}
               alt={file.name}
               loading="lazy"
+              decoding="async"
               onError={() => setImgFailed(true)}
               className="absolute inset-0 size-full object-cover transition-transform duration-300 ease-out group-hover:scale-110"
             />

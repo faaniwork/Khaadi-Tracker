@@ -42,7 +42,14 @@ export async function GET(req) {
         'Content-Type': contentType,
         // Private: this is one user's authorized view of a non-public file,
         // so it must never be held in a shared cache.
-        'Cache-Control': 'private, max-age=3600',
+        //
+        // A day, then a week of serving the cached copy while revalidating
+        // behind it. An hour meant re-downloading every image each time
+        // someone came back to a folder, which is most of what made opening
+        // a dress feel slow. Not `immutable`, because replacing an image in
+        // Drive keeps the file's id, and a week of a stale picture in a
+        // review tool is worse than a revalidation request.
+        'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
       },
     });
   } catch (e) {

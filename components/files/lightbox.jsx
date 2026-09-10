@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, MessageCircle, X as XIcon, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
@@ -26,46 +26,91 @@ const COMMENTED_LABEL = { label: "Comments", color: "var(--warn)", fg: "var(--wa
  * switching images remounts this fresh and the loaded-state resets on its
  * own — no effect needed to watch the index and reset anything.
  */
-function LightboxImage({ file, dressId, scale, onWheel, onToggleZoom }) {
+function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom }) {
   const [loaded, setLoaded] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const frameRef = useRef(null);
+  const dragRef = useRef(null);
   const zoomed = scale > 1;
-  // The frame itself never changes size — only the image inside it scales,
-  // from its own centre. Growing the image's *width* instead (the previous
-  // approach) reflows it inside a scrolling box that starts scrolled to its
-  // top-left corner, which is what made zooming in look like it was
-  // yanking the picture into a corner instead of magnifying it in place.
+  // Derived, not reset by an effect: at 1x the pan is simply ignored, so
+  // zooming back out re-centres for free and the image can never be left
+  // parked off-screen with no way to bring it back.
+  const offset = zoomed ? pan : { x: 0, y: 0 };
+
+  // The wheel listener is attached by hand, non-passive, because React
+  // registers `wheel` as PASSIVE at its root — which makes
+  // event.preventDefault() inside an onWheel prop a silent no-op. That is
+  // the entire reason scrolling over the image used to scroll the page
+  // behind it: the zoom was working, the scroll was never being cancelled.
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      // A mouse wheel reports deltaY in ~100 steps; a trackpad reports many
+      // small ones, and a pinch arrives as a wheel event with ctrlKey set.
+      // Pinch gets a coarser factor because its deltas are tiny.
+      onZoomBy(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [onZoomBy]);
+
+  const onPointerDown = (e) => {
+    if (!zoomed) return;
+    dragRef.current = { startX: e.clientX, startY: e.clientY, fromX: pan.x, fromY: pan.y, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onPointerMove = (e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX;
+    const dy = e.clientY - d.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) d.moved = true;
+    setPan({ x: d.fromX + dx, y: d.fromY + dy });
+  };
+
+  const imgStyle = {
+    maxWidth: "92vw",
+    maxHeight: "80vh",
+    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+  };
+
   return (
     <div
-      className={`relative max-w-[92vw] max-h-full overflow-hidden rounded-lg ${zoomed ? "cursor-zoom-out" : "cursor-zoom-in"}`}
-      onWheel={onWheel}
-      onClick={onToggleZoom}
+      ref={frameRef}
+      className={`relative max-w-[92vw] max-h-full overflow-hidden rounded-lg touch-none ${
+        zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
+      }`}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={() => {
+        // A drag that panned the image must not also count as the click that
+        // toggles zoom, or panning would zoom straight back out.
+        const moved = dragRef.current?.moved;
+        dragRef.current = null;
+        if (!moved) onToggleZoom();
+      }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={driveThumbUrl({ fileId: file.id, dressId, size: GRID_SIZE })}
         alt=""
         aria-hidden="true"
-        className="block transition-transform duration-100 ease-out"
-        style={{
-          maxWidth: "92vw",
-          maxHeight: "80vh",
-          transform: `scale(${scale})`,
-          display: loaded ? "none" : "block",
-          filter: "blur(1px)",
-        }}
+        draggable={false}
+        className="block"
+        style={{ ...imgStyle, display: loaded ? "none" : "block", filter: "blur(1px)" }}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={driveThumbUrl({ fileId: file.id, dressId, size: LIGHTBOX_SIZE })}
         alt={file.name}
         onLoad={() => setLoaded(true)}
-        className="block transition-transform duration-100 ease-out"
-        style={{
-          maxWidth: "92vw",
-          maxHeight: "80vh",
-          transform: `scale(${scale})`,
-          display: loaded ? "block" : "none",
-        }}
+        draggable={false}
+        fetchPriority="high"
+        decoding="async"
+        className="block"
+        style={{ ...imgStyle, display: loaded ? "block" : "none" }}
       />
     </div>
   );
@@ -127,6 +172,16 @@ export function Lightbox({
     });
   }, [index, images, dressId]);
 
+  // Belt and braces with the wheel handler above: while this is open the
+  // page behind it does not scroll at all, by keyboard or scrollbar either.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
@@ -139,6 +194,13 @@ export function Lightbox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose, onIndexChange]);
 
+  const onZoomBy = useCallback((delta) => {
+    setZoomState((z) => {
+      const current = z.index === index ? z.scale : 1;
+      return { index, scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, current + delta)) };
+    });
+  }, [index]);
+
   if (!file) return null;
 
   const sendComment = () => {
@@ -147,18 +209,6 @@ export function Lightbox({
     onAddComment?.(file, text);
     setCommentDraft("");
   };
-  // Mouse wheel and trackpad pinch both arrive as wheel events (pinch sets
-  // ctrlKey on the ones browsers treat as a zoom gesture) — either way,
-  // scrolling over the image zooms it instead of scrolling the page.
-  const onWheelZoom = (e) => {
-    e.preventDefault();
-    // A plain mouse wheel reports deltaY in big steps (~100 per notch); a
-    // trackpad reports many small ones. 0.01 treated one mouse-wheel notch
-    // as "go from 1x to 2x", which read as the image leaping to a random
-    // zoom level rather than zooming — this is gentle enough for both.
-    setScale((s) => s - e.deltaY * 0.0025);
-  };
-
   // Portalled straight onto <body>. Rendered inline it would sit inside the
   // dress card's `rise` entrance animation, and an animated transform on an
   // ancestor — even one that settles on translateY(0) — creates a containing
@@ -235,7 +285,7 @@ export function Lightbox({
           file={file}
           dressId={dressId}
           scale={scale}
-          onWheel={onWheelZoom}
+          onZoomBy={onZoomBy}
           onToggleZoom={() => setScale((s) => (s > 1 ? 1 : CLICK_ZOOM))}
         />
       </div>
