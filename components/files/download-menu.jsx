@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Download, Loader2 } from "lucide-react";
 import { downloadForDresses } from "@/lib/bulkDownload";
 
 const OPTIONS = [
@@ -15,9 +16,18 @@ const OPTIONS = [
  * than a custom popover, so this needs no click-outside handling of its
  * own. Works the same whether `dresses` is one dress, a whole collection,
  * or a whole batch; the caller decides scope by what it passes in.
+ *
+ * The select itself is invisible, not styled: a native select's own closed
+ * -state text box ignores text-align on several mobile browsers, which is
+ * how this used to end up as an off-centre "⬇" character instead of a
+ * proper icon. A real lucide Download icon sits on top instead, painted
+ * from a sibling div rather than the select's own text, so it is always
+ * dead centre and looks like every other icon button in this app instead
+ * of an emoji standing in for one.
  */
 export function DownloadMenu({ dresses, showToast, disabled, className = "" }) {
   const [busy, setBusy] = useState(false);
+  const isDisabled = disabled || busy || !dresses?.length;
   const run = async (mode) => {
     setBusy(true);
     try {
@@ -28,32 +38,34 @@ export function DownloadMenu({ dresses, showToast, disabled, className = "" }) {
   };
 
   return (
-    // A native select rather than a custom popover (see the file's own
-    // note above), which is exactly why this can't show an icon-and-nothing
-    // -else the way a real button can - the closed state is always some
-    // text. Kept as short as a select can go instead: a bare arrow, no
-    // "Download" label repeating what the arrow already says, in a small
-    // round footprint that reads as an icon button at a glance.
-    <select
-      value=""
-      disabled={disabled || busy || !dresses?.length}
-      title="Download"
-      aria-label="Download"
-      onChange={(e) => {
-        const v = e.target.value;
-        e.target.value = "";
-        if (v) run(v);
-      }}
-      className={`appearance-none size-9 shrink-0 rounded-full border border-border bg-secondary text-foreground text-sm font-bold cursor-pointer outline-none text-center focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
-    >
-      <option value="" disabled>
-        {busy ? "…" : "⬇"}
-      </option>
-      {OPTIONS.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
+    <div className={`relative inline-flex size-9 shrink-0 ${className}`}>
+      <select
+        value=""
+        disabled={isDisabled}
+        title="Download"
+        aria-label="Download"
+        onChange={(e) => {
+          const v = e.target.value;
+          e.target.value = "";
+          if (v) run(v);
+        }}
+        className="peer absolute inset-0 size-full appearance-none rounded-full bg-transparent text-transparent cursor-pointer outline-none disabled:cursor-not-allowed"
+      >
+        <option value="" disabled>
+          Download
         </option>
-      ))}
-    </select>
+        {OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 flex items-center justify-center rounded-full border border-border bg-secondary text-foreground transition-colors peer-focus-visible:border-primary ${isDisabled ? "opacity-60" : ""}`}
+      >
+        {busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+      </div>
+    </div>
   );
 }
