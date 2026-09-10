@@ -28,6 +28,7 @@ import { ProfileDialog } from "@/components/dashboard/profile-dialog";
 import { AccessPage } from "@/components/dashboard/access";
 import { OutputView } from "@/components/dashboard/output-view";
 import { Logo } from "@/components/ui/logo";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const POLL_MS = 15000;
 const BATCHES_PER_PAGE = 9;
@@ -95,6 +96,7 @@ export function Dashboard({ user }) {
   const [resyncing, setResyncing] = useState("");
   const [profiles, setProfiles] = useState({ byEmail: {}, byName: {} });
   const [editingProfile, setEditingProfile] = useState(false);
+  const [pendingBulk, setPendingBulk] = useState(null);
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -400,9 +402,27 @@ export function Dashboard({ user }) {
     [costs, setDot, showToast]
   );
 
-  // Applied straight away. There is no confirmation step: it is one status
-  // field on rows that are all visible, and setting it again fixes a mistake.
-  const requestBulkStatus = useCallback(async (scope, key, status) => {
+  // Asking first, because one pick here rewrites the status of every dress in
+  // a batch or collection and there is no undo — a mis-click on a delivered
+  // batch is both easy and expensive. The dialog names the count and the
+  // scope, so it can be dismissed on sight when it is not what was meant.
+  const requestBulkStatus = useCallback(
+    (scope, key, status) => {
+      const count =
+        scope === "collection"
+          ? rows.filter((r) => {
+              const [rel, col] = key.split("␟");
+              return (r.release || "Unsorted") === rel && (r.collection || "Unsorted") === col;
+            }).length
+          : rowsFor(rows, key).length;
+      if (!count) return;
+      const label = scope === "collection" ? key.split("␟")[1] : key;
+      setPendingBulk({ scope, key, status, count, label });
+    },
+    [rows]
+  );
+
+  const applyBulkStatus = useCallback(async ({ scope, key, status }) => {
     let targets;
     if (scope === "collection") {
       const [rel, col] = key.split("␟");
@@ -428,6 +448,12 @@ export function Dashboard({ user }) {
       showToast("Bulk save failed — try again", "error");
     }
   }, [rows, user, showToast]);
+
+  const confirmBulkStatus = useCallback(() => {
+    const pending = pendingBulk;
+    setPendingBulk(null);
+    if (pending) applyBulkStatus(pending);
+  }, [pendingBulk, applyBulkStatus]);
 
   const onAddNote = useCallback(
     async (release, text) => {
@@ -742,6 +768,18 @@ export function Dashboard({ user }) {
         </main>
       </div>
 
+      <ConfirmDialog
+        open={Boolean(pendingBulk)}
+        title={
+          pendingBulk
+            ? `Set all ${pendingBulk.count} dress${pendingBulk.count === 1 ? "" : "es"} to ${pendingBulk.status}?`
+            : ""
+        }
+        description={pendingBulk ? `This changes every dress in ${pendingBulk.label}.` : ""}
+        confirmLabel={pendingBulk ? `Set ${pendingBulk.count} to ${pendingBulk.status}` : "Confirm"}
+        onConfirm={confirmBulkStatus}
+        onCancel={() => setPendingBulk(null)}
+      />
       <Toast message={toast.message} kind={toast.kind} visible={toast.visible} />
       <ProfileDialog
         open={editingProfile}

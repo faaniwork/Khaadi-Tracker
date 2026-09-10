@@ -31,10 +31,14 @@ export function StatusSelect({ value, disabled, onChange }) {
 /**
  * Sets one status across every row in scope.
  *
- * Styled like every other control rather than as a hazard. It used to carry a
- * warning border and an alert glyph and then ask for confirmation on top,
- * which is a lot of friction for something the team does routinely and can
- * simply do again if they pick the wrong one.
+ * Styled like every other control rather than as a hazard: the warning border
+ * and alert glyph it used to carry were shouting on every render, whether or
+ * not anyone was about to touch it.
+ *
+ * The confirmation lives in the caller (see requestBulkStatus in
+ * components/dashboard.jsx), which is the only place that knows how many rows
+ * are actually in scope — and that count is the whole point of asking. This
+ * control deliberately does not ask on its own, so it never double-prompts.
  */
 export function BulkStatusControl({ disabled, onPick }) {
   return (
