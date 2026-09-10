@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Sun, Moon, LogOut } from "lucide-react";
+import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus } from "lucide-react";
 import { moodFor, mascotMessage, sortReleasesByRecency, RELEASE_LINKS } from "@/lib/constants";
 import {
   fetchBoard,
@@ -753,9 +753,9 @@ export function Dashboard({ user }) {
   const activeNavId = view.batch || view.page;
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar items={navItems} active={{ id: activeNavId }} onNav={onNav} />
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
         <MobileNav items={navItems} active={{ id: activeNavId }} onNav={onNav} />
         <Header
           view={view}
@@ -779,7 +779,18 @@ export function Dashboard({ user }) {
           canEdit={canEdit}
           onAddBatch={() => setAddingBatch(true)}
         />
-        <main className="flex-1 max-w-[1280px] w-full mx-auto px-5 sm:px-8 py-6 pb-16">
+        {/* On a wide screen the overview pins its summary and lets only the
+            batch grid scroll, since the grid is the part that grows without
+            limit while the summary above it is a fixed five numbers and two
+            charts. On a phone that would leave no room for the cards at all,
+            so there the whole page scrolls as before. */}
+        <main
+          className={`flex-1 min-h-0 flex flex-col max-w-[1280px] w-full mx-auto px-5 sm:px-8 pt-6 ${
+            !searching && view.page === "overview"
+              ? "overflow-y-auto lg:overflow-hidden pb-16 lg:pb-0"
+              : "overflow-y-auto scrollbar-thin pb-16"
+          }`}
+        >
           {searching ? (
             <SearchResults
               rows={rows}
@@ -800,8 +811,23 @@ export function Dashboard({ user }) {
               />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
               {releases.length ? (
-                <>
+                <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto scrollbar-thin -mx-1 px-1 lg:pb-16">
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
+                    {/* Sat in the header alone and went unfound twice, so it
+                        is also here, in the grid it adds to — a dashed slot
+                        where the next batch will appear reads as "the next
+                        one goes here" in a way a toolbar button does not. */}
+                    {canEdit ? (
+                      <button
+                        type="button"
+                        onClick={() => setAddingBatch(true)}
+                        className="rounded-[14px] border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors min-h-[140px] flex flex-col items-center justify-center gap-2"
+                      >
+                        <Plus className="size-5" />
+                        <span className="f-heading text-sm font-semibold">Add a batch</span>
+                        <span className="text-xs">Creates the folders in Drive</span>
+                      </button>
+                    ) : null}
                     {releases.slice(0, visibleBatches).map((rel) => {
                       const rr = rowsFor(rows, rel);
                       const cols = collectionsFor(rows, rel);
@@ -840,10 +866,15 @@ export function Dashboard({ user }) {
                       </button>
                     </div>
                   ) : null}
-                </>
+                </div>
               ) : (
-                <div className="rounded-[14px] border border-border bg-card p-10 text-center text-sm text-muted-foreground">
-                  No batches yet.
+                <div className="rounded-[14px] border border-dashed border-border p-10 text-center">
+                  <p className="text-sm text-muted-foreground">No batches yet.</p>
+                  {canEdit ? (
+                    <Button size="sm" className="mt-3" onClick={() => setAddingBatch(true)}>
+                      <Plus className="size-3.5" /> Add the first batch
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </>

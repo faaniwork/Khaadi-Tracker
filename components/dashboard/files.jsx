@@ -9,6 +9,7 @@ import {
   driveTrashFile,
   driveRemovedFiles,
   driveRestoreFile,
+  driveThumbUrl,
   driveReview,
   driveComment,
 } from "@/lib/api";
@@ -394,25 +395,43 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground mb-2">
                 Removed — {bin.length} file{bin.length === 1 ? "" : "s"}
               </p>
-              {bin.map((f) => (
-                <div
-                  key={f.id}
-                  className="flex items-center gap-2 py-1.5 border-b border-border last:border-0"
-                >
-                  <span className="text-xs text-foreground truncate flex-1 min-w-0" title={f.name}>
-                    {f.name}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => recover(f)}
-                    disabled={binBusy === f.id}
-                    title="Put this file back in the dress"
-                  >
-                    <Undo2 className="size-3.5" /> {binBusy === f.id ? "Restoring…" : "Recover"}
-                  </Button>
-                </div>
-              ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+                {bin.map((f) => (
+                  <div key={f.id} className="rounded-[10px] border border-border bg-card overflow-hidden">
+                    <div className="aspect-[4/5] bg-secondary grid place-items-center overflow-hidden">
+                      {f.isImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={driveThumbUrl({ fileId: f.id, dressId: dress.id, size: 400 })}
+                          alt={f.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="size-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground px-2 text-center break-all">
+                          {f.name}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="text-[11px] text-muted-foreground truncate" title={f.name}>
+                        {f.name}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-1.5"
+                        onClick={() => recover(f)}
+                        disabled={binBusy === f.id}
+                        title="Put this file back in the dress"
+                      >
+                        <Undo2 className="size-3.5" /> {binBusy === f.id ? "Restoring…" : "Recover"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </div>
