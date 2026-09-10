@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter } from "lucide-react";
+import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter, RefreshCw } from "lucide-react";
 import { moodFor, mascotMessage, sortReleasesByRecency, RELEASE_LINKS, STATUS_OPTIONS } from "@/lib/constants";
 import {
   fetchBoard,
@@ -14,6 +14,7 @@ import {
   syncToSheet,
   renameCollection as renameCollectionApi,
   driveResync,
+  verifyBatches,
   fetchProfiles,
   createBatch,
   deleteBatch,
@@ -116,6 +117,7 @@ export function Dashboard({ user }) {
   const [addingBatch, setAddingBatch] = useState(false);
   const [mascot, setMascot] = useState({ active: false, message: "" });
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [checkingDrive, setCheckingDrive] = useState(false);
   const [releaseFolders, setReleaseFolders] = useState({});
   const [revisions, setRevisions] = useState({ batches: {} });
 
@@ -654,6 +656,54 @@ export function Dashboard({ user }) {
     }
   }, [pendingDelete, showToast, loadData]);
 
+  /**
+   * Catches the board up with Drive: a batch whose folder has been deleted or
+   * trashed comes off the board. One Drive call per batch, so this is cheap
+   * enough to run on its own rather than needing a full resync of each one.
+   *
+   * `quiet` is for the automatic run on load, which should say nothing unless
+   * it actually found something.
+   */
+  const checkDrive = useCallback(
+    async ({ quiet } = {}) => {
+      if (!canEdit) return;
+      setCheckingDrive(true);
+      try {
+        const res = await verifyBatches();
+        if (res.removed?.length) {
+          const names = res.removed.map((r) => r.release).join(", ");
+          showToast(
+            `${names} ${res.removed.length === 1 ? "is" : "are"} gone from Drive, so ${
+              res.removed.length === 1 ? "it has" : "they have"
+            } come off the board.`
+          );
+          await loadData(true);
+        } else if (!quiet) {
+          showToast(
+            res.unknown
+              ? `All ${res.checked} batches still in Drive (${res.unknown} could not be checked).`
+              : `All ${res.checked} batches are still in Drive.`
+          );
+        }
+      } catch (e) {
+        if (!quiet) showToast(e.message || "Could not check Drive", "error");
+      } finally {
+        setCheckingDrive(false);
+      }
+    },
+    [canEdit, showToast, loadData]
+  );
+
+  // Kicked off once, after the board has loaded and the role is known. This
+  // is what makes deleting a folder in Drive show up without anyone pressing
+  // anything: the board catches up on the next visit.
+  const checkedOnce = useRef(false);
+  useEffect(() => {
+    if (!canEdit || checkedOnce.current) return;
+    checkedOnce.current = true;
+    checkDrive({ quiet: true });
+  }, [canEdit, checkDrive]);
+
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
     else if (target === "activity" || target === "access" || target === "outputs") setView({ page: target, batch: null });
@@ -766,7 +816,7 @@ export function Dashboard({ user }) {
             </button>
           </div>
         </header>
-        <main className="w-full max-w-[1600px] mx-auto px-6 lg:px-10 py-6">
+        <main className="w-full max-w-[1440px] mx-auto px-7 xl:px-10 py-7">
           <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
         </main>
         <Toast {...toast} />
@@ -780,9 +830,9 @@ export function Dashboard({ user }) {
   const activeNavId = view.batch || view.page;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-frame gap-2.5 p-2.5">
       <Sidebar items={navItems} active={{ id: activeNavId }} onNav={onNav} />
-      <div className="flex-1 min-w-0 flex flex-col min-h-0">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0 rounded-[18px] border border-border bg-background overflow-hidden">
         <MobileNav items={navItems} active={{ id: activeNavId }} onNav={onNav} />
         <Header
           view={view}
@@ -806,7 +856,7 @@ export function Dashboard({ user }) {
             charts. On a phone that would leave no room for the cards at all,
             so there the whole page scrolls as before. */}
         <main
-          className={`flex-1 min-h-0 flex flex-col w-full max-w-[1600px] mx-auto px-6 lg:px-10 pt-6 ${
+          className={`flex-1 min-h-0 flex flex-col w-full max-w-[1440px] mx-auto px-7 xl:px-10 pt-7 ${
             !searching && view.page === "overview"
               ? "overflow-y-auto lg:overflow-hidden pb-16 lg:pb-0"
               : "overflow-y-auto scrollbar-thin pb-16"
@@ -830,6 +880,7 @@ export function Dashboard({ user }) {
                 onMascotClick={onMascotClick}
               />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
+              <div className="flex-1 min-h-0 flex flex-col rounded-[14px] border border-border bg-card/40 px-4 pt-3.5 pb-1 mb-1">
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <h2 className="f-heading text-sm font-semibold text-foreground">
                   Batches
@@ -843,6 +894,18 @@ export function Dashboard({ user }) {
                 {canEdit ? (
                   <Button size="sm" variant="ghost" onClick={() => setAddingBatch(true)}>
                     <Plus className="size-3.5" /> Add batch
+                  </Button>
+                ) : null}
+                {canEdit ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => checkDrive()}
+                    disabled={checkingDrive}
+                    title="Check every batch still exists in Drive"
+                  >
+                    <RefreshCw className={`size-3.5 ${checkingDrive ? "animate-spin" : ""}`} />
+                    {checkingDrive ? "Checking Drive" : "Check Drive"}
                   </Button>
                 ) : null}
                 <div className="ml-auto flex items-center gap-1.5">
@@ -911,7 +974,7 @@ export function Dashboard({ user }) {
                   ) : null}
                 </div>
               ) : (
-                <div className="rounded-[14px] border border-dashed border-border p-10 text-center">
+                <div className="rounded-[12px] border border-dashed border-border p-10 text-center mb-3">
                   <p className="text-sm text-muted-foreground">No batches yet.</p>
                   {canEdit ? (
                     <Button size="sm" className="mt-3" onClick={() => setAddingBatch(true)}>
@@ -920,6 +983,7 @@ export function Dashboard({ user }) {
                   ) : null}
                 </div>
               )}
+              </div>
             </>
           ) : view.page === "activity" ? (
             <ActivityPage profiles={profiles} rows={rows} onJump={onActivityJump} />

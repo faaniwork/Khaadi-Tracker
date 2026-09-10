@@ -133,8 +133,8 @@ export function Header({
   const viewOnly = role !== "admin" && role !== "editor";
   const mode = view.page === "outputs" ? "outputs" : "dashboard";
   return (
-    <header className="sticky top-0 z-20 backdrop-blur border-b border-border bg-background/85">
-      <div className="w-full max-w-[1600px] mx-auto px-6 lg:px-10 flex items-center gap-3 h-14">
+    <header className="shrink-0 border-b border-border bg-background">
+      <div className="w-full max-w-[1440px] mx-auto px-7 xl:px-10 flex items-center gap-3 h-14">
         <ModeTabs mode={mode} onNav={onNav} />
         <div className="ml-auto flex items-center gap-2">
           {/* A bare green dot next to a search box was a pixel nobody could
@@ -220,7 +220,7 @@ export function Header({
           </div>
         </div>
       </div>
-      <div className="w-full max-w-[1600px] mx-auto px-6 lg:px-10 pb-5">
+      <div className="w-full max-w-[1440px] mx-auto px-7 xl:px-10 pb-5">
         <Crumb view={view} onBack={onBack} />
       </div>
     </header>

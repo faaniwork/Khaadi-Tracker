@@ -14,12 +14,12 @@ import {
   driveComment,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/input";
 import { FileTile } from "@/components/files/file-tile";
 import { RejectDialog } from "@/components/files/reject-dialog";
 import { Dropzone } from "@/components/files/dropzone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PromptDialog } from "@/components/ui/prompt-dialog";
 import { Lightbox } from "@/components/files/lightbox";
 import { DownloadMenu } from "@/components/files/download-menu";
 
@@ -53,7 +53,8 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const [rejectError, setRejectError] = useState("");
   const [savingReject, setSavingReject] = useState(false);
   const [confirmTrash, setConfirmTrash] = useState(null);
-  const [newFolder, setNewFolder] = useState("");
+  const [namingFolder, setNamingFolder] = useState(false);
+  const [folderError, setFolderError] = useState("");
   const [creating, setCreating] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
@@ -276,16 +277,19 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     }
   };
 
-  const createFolder = async () => {
-    const name = newFolder.trim();
-    if (!name) return;
+  const createFolder = async (name, clear) => {
     setCreating(true);
+    setFolderError("");
     try {
       await driveCreateFolder({ dressId: dress.id, parentId: currentFolder, name });
-      setNewFolder("");
+      clear?.();
+      setNamingFolder(false);
+      showToast?.(`Created "${name}"`, "ok");
       load(currentFolder);
     } catch (e) {
-      showToast?.(e.message || "Could not create the folder", "error");
+      // Kept in the dialog rather than fired off as a toast, so the name is
+      // still there to correct instead of having to be retyped.
+      setFolderError(e.message || "Could not create the folder");
     } finally {
       setCreating(false);
     }
@@ -372,15 +376,15 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
             }
           />
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <Input
-              value={newFolder}
-              onChange={(e) => setNewFolder(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && createFolder()}
-              placeholder="New subfolder name…"
-              className="max-w-[220px]"
-            />
-            <Button variant="ghost" size="sm" onClick={createFolder} disabled={creating || !newFolder.trim()}>
-              <FolderPlus className="size-3.5" /> {creating ? "Creating…" : "Add folder"}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFolderError("");
+                setNamingFolder(true);
+              }}
+            >
+              <FolderPlus className="size-3.5" /> Add folder
             </Button>
           </div>
         </>
@@ -481,6 +485,22 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         </div>
       )}
 
+      <PromptDialog
+        open={namingFolder}
+        title="New folder"
+        description={
+          atRoot
+            ? `Created inside ${dress.dress} in Drive.`
+            : `Created inside ${trail[trail.length - 1]?.name} in Drive.`
+        }
+        label="Folder name"
+        placeholder="e.g. Selects"
+        confirmLabel="Create folder"
+        saving={creating}
+        error={folderError}
+        onSubmit={createFolder}
+        onCancel={() => setNamingFolder(false)}
+      />
       <RejectDialog
         key={rejecting?.id || "none"}
         open={Boolean(rejecting)}
