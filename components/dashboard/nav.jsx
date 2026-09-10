@@ -15,12 +15,15 @@ import { Logo } from "@/components/ui/logo";
  *   0%         empty ring with NO number, since a bare "0" reads as noise
  *   anything   the usual progress ring with its percentage
  */
-function NavRing({ id, pct, icon: Icon, discarded }) {
+function NavRing({ id, pct, icon: Icon, discarded, dim }) {
   if (id === "overview" || Icon) {
     const DisplayIcon = Icon || LayoutGrid;
     return (
       <div className="ring-chart" style={{ width: 44, height: 44, background: "var(--secondary)" }}>
-        <DisplayIcon className="size-4 text-foreground" />
+        <DisplayIcon
+          className="size-4"
+          style={{ color: dim ? "var(--muted-foreground)" : "var(--foreground)" }}
+        />
       </div>
     );
   }
@@ -29,15 +32,44 @@ function NavRing({ id, pct, icon: Icon, discarded }) {
       <Ring
         pct={100}
         size={44}
-        color="var(--destructive)"
-        label={<Ban className="size-4" style={{ color: "var(--destructive)" }} />}
+        color={dim ? "color-mix(in oklch, var(--destructive) 45%, transparent)" : "var(--destructive)"}
+        label={
+          <Ban
+            className="size-4"
+            style={{
+              color: dim
+                ? "color-mix(in oklch, var(--destructive) 55%, transparent)"
+                : "var(--destructive)",
+            }}
+          />
+        }
       />
     );
   }
   const rounded = Math.round(pct || 0);
-  return <Ring pct={pct} size={44} label={rounded ? String(rounded) : ""} />;
+  return (
+    <Ring
+      pct={pct}
+      size={44}
+      color={dim ? "var(--muted-foreground)" : "var(--foreground)"}
+      label={rounded ? String(rounded) : ""}
+    />
+  );
 }
 
+/**
+ * Where you are, shown by CONTRAST rather than by decoration.
+ *
+ * The previous attempt drew a bar on the sidebar's edge and a filled pill
+ * behind the active item, and it read as a glitch: a floating black stub
+ * beside a grey block. The cause was that every ring was at full strength,
+ * so the current one had to shout to be picked out at all.
+ *
+ * Now the others step back. Inactive rings and labels are muted, the active
+ * one is at full strength, and nothing extra is drawn. It is the same trick
+ * that makes the rest of this board readable: colour, or in this case
+ * contrast, only where it means something.
+ */
 function NavButton({ it, isActive, onNav }) {
   return (
     <button
@@ -45,25 +77,21 @@ function NavButton({ it, isActive, onNav }) {
       onClick={() => onNav(it.id)}
       aria-current={isActive ? "page" : undefined}
       title={it.discarded ? `${it.label} - all discarded` : it.label}
-      className={`relative flex flex-col items-center gap-1.5 py-2.5 w-full rounded-xl transition-colors duration-200 ${
-        isActive ? "bg-secondary" : "hover:bg-secondary/50"
+      className={`flex flex-col items-center gap-1.5 py-2.5 w-full rounded-xl transition-opacity duration-200 ${
+        isActive ? "opacity-100" : "opacity-55 hover:opacity-100"
       }`}
     >
-      {/* Which batch you are looking at was carried entirely by a colour
-          change on a 9.5px label, which is to say it was not carried at all.
-          A filled pill and a bar on the sidebar's own edge say it from
-          across the room. */}
-      {isActive ? (
-        <span
-          aria-hidden="true"
-          className="absolute left-0 top-1/2 -translate-y-1/2 h-8 w-[3px] rounded-r-full bg-foreground"
-        />
-      ) : null}
-      <NavRing id={it.id} pct={it.pct} icon={it.icon} discarded={it.discarded} />
+      <NavRing
+        id={it.id}
+        pct={it.pct}
+        icon={it.icon}
+        discarded={it.discarded}
+        dim={!isActive}
+      />
       <span
-        className={`f-mono text-[9.5px] font-bold uppercase tracking-wide transition-colors ${
-          isActive ? "text-foreground" : "text-muted-foreground"
-        } ${it.discarded ? "line-through opacity-70" : ""}`}
+        className={`f-mono text-[9.5px] uppercase tracking-wide transition-colors ${
+          isActive ? "font-bold text-foreground" : "font-semibold text-muted-foreground"
+        } ${it.discarded ? "line-through" : ""}`}
       >
         {it.label}
       </span>
