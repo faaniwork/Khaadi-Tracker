@@ -159,12 +159,34 @@ button, a { touch-action: manipulation; }
 .rise { animation: riseIn 220ms cubic-bezier(.22,.61,.36,1) both; }
 
 /* The chat panel's own entrance: pulled out from the edge tab that opens
-   it, not faded up from below like everything else - see ChatWidget. */
+   it, not faded up from below like everything else - see ChatWidget. Below
+   md the panel takes over the whole screen instead of docking beside the
+   tab (a phone has no room for a docked side panel), so the entrance
+   becomes a plain rise instead of a slide from an edge that no longer
+   means anything at that width. */
 @keyframes chatSlideIn {
   from { opacity: 0; transform: translateX(28px); }
   to { opacity: 1; transform: translateX(0); }
 }
 .chat-slide-in { animation: chatSlideIn 320ms cubic-bezier(.22,1,.36,1) both; }
+@media (max-width: 767px) {
+  @keyframes chatSlideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* The chat tab's hover "nod": a brief wobble layered on top of the sustained
+   pulled-out hover state (see ChatWidget) - plays once per hover via a class
+   toggled in JS and cleared on animationend, ending at the same translateX
+   the plain hover transition holds, so removing the class causes no jump. */
+@keyframes chatTabNod {
+  0% { transform: translateX(0) rotate(0deg); }
+  30% { transform: translateX(-8px) rotate(-6deg); }
+  60% { transform: translateX(-14px) rotate(4deg); }
+  100% { transform: translateX(-12px) rotate(0deg); }
+}
+.chat-tab-nod { animation: chatTabNod 480ms cubic-bezier(.34,1.4,.64,1) both; }
 
 /* One orchestrated reveal on load beats a dozen unrelated micro-animations.
    Children come in on a 40ms ladder, capped at eight so a long list never

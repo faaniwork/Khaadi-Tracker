@@ -840,7 +840,7 @@ export function Dashboard({ user }) {
           <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
         </main>
         <Toast {...toast} />
-        <ChatWidget user={user} />
+        <ChatWidget user={user} profiles={profiles} />
       </div>
     );
   }
@@ -1101,6 +1101,7 @@ export function Dashboard({ user }) {
         open={editingProfile}
         user={user}
         avatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
+        name={profiles.byEmail[(user?.email || "").toLowerCase()]?.name}
         onSaved={(profile) =>
           setProfiles((prev) => ({
             byEmail: { ...prev.byEmail, [profile.email]: profile },
@@ -1110,7 +1111,7 @@ export function Dashboard({ user }) {
         onClose={() => setEditingProfile(false)}
       />
       <ConfettiCanvas />
-      <ChatWidget user={user} />
+      <ChatWidget user={user} profiles={profiles} />
     </div>
   );
 }

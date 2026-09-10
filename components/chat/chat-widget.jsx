@@ -2,17 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, X, Send, Check, Users, ImagePlus, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Check, Users, ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import {
   fetchChatStatus,
   requestChatAccess,
   fetchChatMessages,
   sendChatMessage,
+  deleteChatMessage,
   grantChatAccess,
   uploadChatImage,
   chatImageUrl,
 } from "@/lib/api";
+import { Avatar } from "@/components/ui/avatar";
 
 const STATUS_POLL_MS = 20000;
 const MESSAGES_POLL_MS = 4000;
@@ -31,7 +33,7 @@ const MESSAGES_POLL_MS = 4000;
  * conversation exists - the tab itself only renders once the first status
  * check comes back, and until then nothing shows at all.
  */
-export function ChatWidget({ user }) {
+export function ChatWidget({ user, profiles }) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(null); // null while loading, then 'none' | 'pending' | 'granted'
   const [isAdmin, setIsAdmin] = useState(false);
@@ -41,6 +43,7 @@ export function ChatWidget({ user }) {
   const [busy, setBusy] = useState(false);
   const [uploadPct, setUploadPct] = useState(null); // null when not uploading
   const [dragOver, setDragOver] = useState(false);
+  const [nodding, setNodding] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -176,6 +179,21 @@ export function ChatWidget({ user }) {
     }
   };
 
+  const onDelete = async (id) => {
+    const before = messages;
+    setMessages((prev) => prev.filter((m) => m.id !== id)); // optimistic
+    try {
+      await deleteChatMessage({ id });
+    } catch (e) {
+      setMessages(before); // put it back - the delete never actually happened
+    }
+  };
+
+  /** A profile's own current name/picture wins over whatever a message was
+   * stamped with at send time, so renaming yourself relabels your history
+   * too instead of leaving old messages under a stale name. */
+  const profileFor = (email) => profiles?.byEmail?.[String(email || "").toLowerCase()];
+
   // Nothing at all until the first status check answers. A viewer who will
   // never be granted access should never see so much as an empty bubble
   // hinting that a chat exists.
@@ -191,14 +209,20 @@ export function ChatWidget({ user }) {
           onDragOver={status === "granted" ? onDragOver : undefined}
           onDragLeave={status === "granted" ? onDragLeave : undefined}
           onDrop={status === "granted" ? onDrop : undefined}
-          // Docked to the right edge near the bottom, the same anchor the
-          // tab itself uses (see the trigger below) - flush on the right,
-          // rounded only where it faces the page, so the panel reads as
-          // having been pulled out of the tab rather than a card floating
-          // free in a corner.
-          className="fixed z-50 right-0 bottom-[calc(9.5rem+env(safe-area-inset-bottom))] md:bottom-24 flex flex-col w-[min(360px,calc(100vw-2rem))] h-[min(520px,calc(100vh-11rem))] rounded-l-[20px] border border-r-0 border-border bg-card shadow-xl overflow-hidden chat-slide-in"
+          // Docked to the right edge near the bottom on a real screen, the
+          // same anchor the tab itself uses - flush on the right, rounded
+          // only where it faces the page, so the panel reads as having been
+          // pulled out of the tab rather than a card floating free in a
+          // corner. Below md that entire idea stops making sense (there is
+          // no room beside a phone-width viewport for a docked side panel),
+          // so it takes over the whole screen instead, the way a chat app
+          // opens a full conversation view rather than a popover.
+          className="fixed z-50 inset-0 md:inset-auto md:right-0 md:bottom-[calc(11rem+env(safe-area-inset-bottom))] flex flex-col w-full md:w-[min(360px,calc(100vw-2rem))] h-full md:h-[min(520px,calc(100vh-11rem))] rounded-none md:rounded-l-[20px] border-0 md:border md:border-r-0 border-border bg-card shadow-xl overflow-hidden chat-slide-in"
         >
-          <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border bg-secondary/40">
+          <div
+            className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border bg-secondary/40"
+            style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}
+          >
             <MessageCircle className="size-4 text-primary" />
             <h2 className="f-heading text-sm font-bold text-foreground">Chat</h2>
             {isAdmin && pendingCount ? (
@@ -248,31 +272,63 @@ export function ChatWidget({ user }) {
                 {messages.length ? (
                   messages.map((m) => {
                     const mine = m.email === user?.email;
+                    const profile = profileFor(m.email);
+                    const displayName = mine ? "You" : profile?.name || m.name || m.email;
+                    const canDelete = mine || isAdmin;
                     return (
-                      <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                        <span className="text-[10px] text-muted-foreground mb-0.5">
-                          {mine ? "You" : m.name || m.email} · {timeAgo(m.at)}
-                        </span>
-                        <div
-                          className="max-w-[85%] rounded-2xl overflow-hidden"
-                          style={
-                            mine
-                              ? { background: "var(--primary)", color: "var(--primary-foreground)" }
-                              : { background: "var(--secondary)", color: "var(--foreground)" }
-                          }
-                        >
-                          {m.imageId ? (
-                            <a href={chatImageUrl({ fileId: m.imageId, size: 1600 })} target="_blank" rel="noopener noreferrer">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={chatImageUrl({ fileId: m.imageId, size: 500 })}
-                                alt={m.imageName || "Shared image"}
-                                loading="lazy"
-                                className="block w-full max-h-64 object-cover"
-                              />
-                            </a>
-                          ) : null}
-                          {m.text ? <p className="px-3 py-1.5 text-sm leading-snug break-words">{m.text}</p> : null}
+                      <div key={m.id} className={`group flex items-end gap-2 ${mine ? "flex-row-reverse" : "flex-row"}`}>
+                        {mine ? null : (
+                          <Avatar name={profile?.name || m.name || m.email} avatar={profile?.avatar} size={24} />
+                        )}
+                        <div className={`flex flex-col max-w-[75%] ${mine ? "items-end" : "items-start"}`}>
+                          <span className="text-[10px] text-muted-foreground mb-0.5">
+                            {displayName} · {timeAgo(m.at)}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {mine && canDelete ? (
+                              <button
+                                type="button"
+                                onClick={() => onDelete(m.id)}
+                                aria-label="Delete message"
+                                title="Delete"
+                                className="size-6 shrink-0 rounded-full grid place-items-center text-muted-foreground/60 hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            ) : null}
+                            <div
+                              className="rounded-2xl overflow-hidden"
+                              style={
+                                mine
+                                  ? { background: "var(--primary)", color: "var(--primary-foreground)" }
+                                  : { background: "var(--secondary)", color: "var(--foreground)" }
+                              }
+                            >
+                              {m.imageId ? (
+                                <a href={chatImageUrl({ fileId: m.imageId, size: 1600 })} target="_blank" rel="noopener noreferrer">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={chatImageUrl({ fileId: m.imageId, size: 500 })}
+                                    alt={m.imageName || "Shared image"}
+                                    loading="lazy"
+                                    className="block w-full max-h-64 object-cover"
+                                  />
+                                </a>
+                              ) : null}
+                              {m.text ? <p className="px-3 py-1.5 text-sm leading-snug break-words">{m.text}</p> : null}
+                            </div>
+                            {!mine && canDelete ? (
+                              <button
+                                type="button"
+                                onClick={() => onDelete(m.id)}
+                                aria-label="Delete message"
+                                title="Delete"
+                                className="size-6 shrink-0 rounded-full grid place-items-center text-muted-foreground/60 hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="size-3" />
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     );
@@ -299,7 +355,11 @@ export function ChatWidget({ user }) {
                 </div>
               ) : null}
 
-              <form onSubmit={onSend} className="shrink-0 flex items-center gap-1.5 p-3 border-t border-border">
+              <form
+                onSubmit={onSend}
+                className="shrink-0 flex items-center gap-1.5 p-3 border-t border-border"
+                style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+              >
                 <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
                 <button
                   type="button"
@@ -357,27 +417,42 @@ export function ChatWidget({ user }) {
         </div>
       ) : null}
 
-      {/* The tab itself: welded to the edge (rounded only on the side
-          facing the page, flush and borderless on the side facing off
-          -screen) so it reads as part of the screen's own edge, not a
-          button floating over the content - a smooth, gentle ease on hover
-          bulges it and pulls it a couple pixels further out, the same
-          "grab me" cue as the reference's peeling QR corner. Anchored near
-          the bottom, clear of the phone's fixed tab bar below md the same
-          way the toast is (see components/toast.jsx). Hidden while the
-          panel itself is open rather than turned into a close button, since
-          the panel already has its own. */}
+      {/* The tab itself: not a flat semicircle flush against the edge, but
+          the edge's own silhouette pinching inward above and below a full
+          circular bulge that carries the icon - the same wave a boarding
+          pass cuts into its own edge to seat a QR corner. One SVG path
+          draws the whole wavy outline in one solid fill, so the curve is
+          exact rather than approximated with border-radius tricks. On
+          hover it noses further out (translateX) with a brief rotating
+          "nod" wobble layered on top (chatTabNod, triggered once per hover
+          via the class below and cleared on animationend so the next hover
+          plays it again) before settling into the pulled-out resting
+          position - see the matching keyframes in globals.css. Anchored
+          near the bottom, clear of the phone's fixed tab bar below md the
+          same way the toast is (see components/toast.jsx). Hidden while
+          the panel itself is open rather than turned into a close button,
+          since the panel already has its own. */}
       {!open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
+          onMouseEnter={() => setNodding(true)}
+          onAnimationEnd={() => setNodding(false)}
           aria-label="Open chat"
-          className="fixed z-50 right-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6 flex items-center justify-center h-14 w-10 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-[transform,width] duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-x-1 hover:w-12 active:scale-95"
+          className={`fixed z-50 right-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-12 w-10 h-24 transition-transform duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-x-3 active:scale-95 ${nodding ? "chat-tab-nod" : ""}`}
+          style={{ transformOrigin: "right center" }}
         >
-          <MessageCircle className="size-5" />
+          <svg viewBox="0 0 40 96" width="40" height="96" className="absolute inset-0 overflow-visible">
+            <path
+              d="M40,0 L40,96 L26,96 C26,88 32,84 30,78 C28,68 8,58 0,48 C8,38 28,28 30,18 C32,12 26,8 26,0 Z"
+              fill="var(--primary)"
+              className="drop-shadow-lg"
+            />
+          </svg>
+          <MessageCircle className="absolute size-4 text-primary-foreground" style={{ left: 3, top: 40 }} />
           {pendingCount ? (
             <span
-              className="absolute top-0.5 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
+              className="absolute top-3 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
               style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
             >
               {pendingCount}

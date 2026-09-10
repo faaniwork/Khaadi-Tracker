@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { hasChatAccess, listChatMessages, postChatMessage } from '@/lib/db';
+import { hasChatAccess, listChatMessages, postChatMessage, deleteChatMessage } from '@/lib/db';
 
 async function requireAccess(email) {
   if (!(await hasChatAccess(email))) {
@@ -42,5 +42,21 @@ export async function POST(req) {
     const status = e.code === 'CHAT_ACCESS_REQUIRED' ? 403 : e.status || 400;
     if (status >= 500) console.error('chat message post failed', e);
     return NextResponse.json({ error: e.message || 'Could not send that', code: e.code }, { status });
+  }
+}
+
+/** DELETE /api/chat/messages   { id }  - your own message, or any as an admin. */
+export async function DELETE(req) {
+  const session = await auth();
+  if (!session?.user?.email) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 });
+  try {
+    const { id } = await req.json();
+    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    await deleteChatMessage({ email: session.user.email, messageId: id });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    const status = e.code === 'FORBIDDEN' ? 403 : e.status || 500;
+    if (status >= 500) console.error('chat message delete failed', e);
+    return NextResponse.json({ error: e.message || 'Could not delete that', code: e.code }, { status });
   }
 }
