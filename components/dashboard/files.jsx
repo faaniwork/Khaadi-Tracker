@@ -390,7 +390,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       <ConfirmDialog
         open={Boolean(confirmTrash)}
         title="Remove this file?"
-        description={`"${confirmTrash?.name || ""}" will disappear from here straight away. Nothing is destroyed — it goes to Drive's trash, or to a "Removed" folder in Drive if its owner hasn't given us trash rights.`}
+        description={`"${confirmTrash?.name || ""}" — it stays in Drive.`}
         confirmLabel="Remove"
         onConfirm={doTrash}
         onCancel={() => setConfirmTrash(null)}

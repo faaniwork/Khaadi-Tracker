@@ -41,7 +41,7 @@ export function ConfirmDialog({ open, title, description, confirmLabel = "Confir
         <h2 id="confirm-title" className="f-heading text-base font-bold text-foreground">
           {title}
         </h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
+        {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onCancel}>
             Cancel

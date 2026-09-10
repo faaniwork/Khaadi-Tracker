@@ -740,11 +740,6 @@ export function Dashboard({ user }) {
             />
           )}
         </main>
-        <footer className="max-w-[1280px] mx-auto px-5 sm:px-8 pb-10 text-xs text-muted-foreground">
-          Editors&rsquo; changes to status, comments and credit cost save straight to the database and are tagged
-          with whoever made them. Everyone else sees a live, view-only copy. Refreshes automatically every few
-          seconds — ask an admin to add you as an editor in the access table.
-        </footer>
       </div>
 
       <Toast message={toast.message} kind={toast.kind} visible={toast.visible} />
