@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { MessageCircle, X, Send, Check, Users, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { MessageCircle, X, Send, Check, Users, ImagePlus, Loader2, Trash2, Reply, SmilePlus } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import {
   fetchChatStatus,
@@ -10,6 +10,7 @@ import {
   fetchChatMessages,
   sendChatMessage,
   deleteChatMessage,
+  reactToChatMessage,
   grantChatAccess,
   uploadChatImage,
   chatImageUrl,
@@ -18,6 +19,210 @@ import { Avatar } from "@/components/ui/avatar";
 
 const STATUS_POLL_MS = 20000;
 const MESSAGES_POLL_MS = 4000;
+
+// Kept in step with REACTION_EMOJI in lib/db.js - the server rejects
+// anything outside this set, so the picker only ever offers what will stick.
+const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+// How far a swipe has to travel before it counts as "reply", in pixels - a
+// deliberate drag, not an accidental brush while scrolling the list.
+const SWIPE_REPLY_PX = 46;
+const SWIPE_CAP_PX = 64;
+
+/**
+ * One message bubble, its own little state machine for the two gestures
+ * WhatsApp trained everyone to expect: swipe the bubble to reply (a live
+ * drag with a reply arrow that fades in as you pull), and a reaction picker
+ * that a tap opens right where the smiley button is - long-press is where
+ * that lives on a phone screen you can't hover, but tapping a real button
+ * works everywhere, so a button ships too rather than gambling the whole
+ * feature on how well a timer-based long-press survives a scrolling list.
+ */
+function ChatMessageRow({ m, mine, displayName, avatarName, avatarPic, canDelete, currentEmail, onDelete, onReply, onReact }) {
+  const [dx, setDx] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const [reactOpen, setReactOpen] = useState(false);
+  const touch = useRef({ x: 0, y: 0, active: false, decided: false });
+
+  const onTouchStart = (e) => {
+    const t = e.touches[0];
+    touch.current = { x: t.clientX, y: t.clientY, active: true, decided: false };
+  };
+  const onTouchMove = (e) => {
+    if (!touch.current.active) return;
+    const t = e.touches[0];
+    const rawDx = t.clientX - touch.current.x;
+    const rawDy = t.clientY - touch.current.y;
+    if (!touch.current.decided) {
+      if (Math.abs(rawDx) < 8 && Math.abs(rawDy) < 8) return;
+      // A vertical drag is a scroll, not a reply - bail out for good so the
+      // list keeps scrolling normally for the rest of this touch.
+      if (Math.abs(rawDy) > Math.abs(rawDx)) {
+        touch.current.active = false;
+        return;
+      }
+      touch.current.decided = true;
+      setSwiping(true);
+    }
+    e.preventDefault();
+    setDx(Math.max(-SWIPE_CAP_PX, Math.min(SWIPE_CAP_PX, rawDx)));
+  };
+  const endTouch = () => {
+    if (touch.current.decided && Math.abs(dx) >= SWIPE_REPLY_PX) onReply();
+    touch.current.active = false;
+    touch.current.decided = false;
+    setSwiping(false);
+    setDx(0);
+  };
+
+  return (
+    <div
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={endTouch}
+      onTouchCancel={endTouch}
+      className={`group relative flex items-end gap-2 ${mine ? "flex-row-reverse" : "flex-row"}`}
+      style={{ transform: `translateX(${dx}px)`, transition: swiping ? "none" : "transform 200ms ease" }}
+    >
+      {/* The reply arrow a swipe reveals, faded in with how far you've
+          pulled rather than snapping on at the threshold - it should feel
+          like the gesture is doing something the whole way, not silent
+          until it suddenly works. */}
+      <div
+        className="absolute inset-y-0 flex items-center text-muted-foreground pointer-events-none"
+        style={{ [mine ? "right" : "left"]: "100%", opacity: Math.min(1, Math.abs(dx) / SWIPE_REPLY_PX) }}
+      >
+        <Reply className="size-4" />
+      </div>
+
+      {mine ? null : <Avatar name={avatarName} avatar={avatarPic} size={24} />}
+      <div className={`flex flex-col max-w-[75%] ${mine ? "items-end" : "items-start"}`}>
+        <span className="text-[10px] text-muted-foreground mb-0.5">
+          {displayName} · {timeAgo(m.at)}
+        </span>
+        <div className="flex items-center gap-1">
+          {mine ? <RowActions /> : null}
+          <div className="flex flex-col gap-1" style={{ alignItems: mine ? "flex-end" : "flex-start" }}>
+            <div
+              className="rounded-2xl overflow-hidden"
+              style={
+                mine
+                  ? { background: "var(--primary)", color: "var(--primary-foreground)" }
+                  : { background: "var(--secondary)", color: "var(--foreground)" }
+              }
+            >
+              {m.replyTo ? (
+                <div
+                  className="mx-2 mt-2 px-2 py-1 rounded-lg text-xs border-l-2 opacity-80 truncate max-w-[220px]"
+                  style={{ borderColor: mine ? "var(--primary-foreground)" : "var(--primary)", background: "rgb(0 0 0 / 0.08)" }}
+                >
+                  <span className="font-bold">{m.replyTo.name || "Someone"}</span>{" "}
+                  {m.replyTo.text || (m.replyTo.imageId ? "📷 Photo" : "")}
+                </div>
+              ) : null}
+              {m.imageId ? (
+                <a href={chatImageUrl({ fileId: m.imageId, size: 1600 })} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={chatImageUrl({ fileId: m.imageId, size: 500 })}
+                    alt={m.imageName || "Shared image"}
+                    loading="lazy"
+                    className="block w-full max-h-64 object-cover"
+                  />
+                </a>
+              ) : null}
+              {m.text ? <p className="px-3 py-1.5 text-sm leading-snug break-words">{m.text}</p> : null}
+            </div>
+            {m.reactions?.length ? (
+              <div className="flex flex-wrap gap-1">
+                {m.reactions.map((r) => {
+                  const mineToo = r.emails.includes(currentEmail);
+                  return (
+                    <button
+                      key={r.emoji}
+                      type="button"
+                      onClick={() => onReact(r.emoji)}
+                      className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] border transition-colors"
+                      style={
+                        mineToo
+                          ? { borderColor: "var(--primary)", background: "color-mix(in oklch, var(--primary) 15%, var(--card))" }
+                          : { borderColor: "var(--border)", background: "var(--card)" }
+                      }
+                    >
+                      <span>{r.emoji}</span>
+                      <span className="font-semibold text-muted-foreground">{r.count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+          {mine ? null : <RowActions />}
+        </div>
+      </div>
+    </div>
+  );
+
+  /** Reply, react and delete - the same three icons on either side of the
+      bubble, mirrored so they always sit on the outside away from the
+      avatar. Always visible rather than hover-only: half of this app's
+      audience is on a phone with no hover state at all. */
+  function RowActions() {
+    return (
+      <div className="relative flex items-center gap-0.5 shrink-0">
+        {canDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label="Delete message"
+            title="Delete"
+            className="size-6 shrink-0 rounded-full grid place-items-center text-muted-foreground/60 hover:text-destructive transition-colors"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setReactOpen((s) => !s)}
+          aria-label="React"
+          title="React"
+          className="size-6 shrink-0 rounded-full grid place-items-center text-muted-foreground/60 hover:text-foreground transition-colors"
+        >
+          <SmilePlus className="size-3" />
+        </button>
+        <button
+          type="button"
+          onClick={onReply}
+          aria-label="Reply"
+          title="Reply"
+          className="size-6 shrink-0 rounded-full grid place-items-center text-muted-foreground/60 hover:text-foreground transition-colors"
+        >
+          <Reply className="size-3" />
+        </button>
+        {reactOpen ? (
+          <div
+            className="absolute bottom-full mb-1 flex items-center gap-0.5 rounded-full border border-border bg-card shadow-lg px-1.5 py-1 z-10"
+            style={{ [mine ? "right" : "left"]: 0 }}
+          >
+            {REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => {
+                  onReact(emoji);
+                  setReactOpen(false);
+                }}
+                className="size-6 grid place-items-center text-sm rounded-full hover:bg-secondary transition-colors"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+}
 
 /**
  * The board-wide chat. Not a floating corner bubble - a tab welded to the
@@ -44,6 +249,7 @@ export function ChatWidget({ user, profiles }) {
   const [uploadPct, setUploadPct] = useState(null); // null when not uploading
   const [dragOver, setDragOver] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // { id, label, text, imageId } | null
   const listRef = useRef(null);
   const fileInputRef = useRef(null);
   const statusTimer = useRef(null);
@@ -110,8 +316,10 @@ export function ChatWidget({ user, profiles }) {
     if (!text || busy) return;
     setBusy(true);
     setDraft("");
+    const replyToId = replyingTo?.id;
+    setReplyingTo(null);
     try {
-      const { message } = await sendChatMessage({ text });
+      const { message } = await sendChatMessage({ text, replyToId });
       setMessages((prev) => [...prev, message]);
     } catch (e) {
       setDraft(text);
@@ -128,11 +336,13 @@ export function ChatWidget({ user, profiles }) {
   const sendImage = async (file) => {
     if (!file || !file.type.startsWith("image/")) return;
     const caption = draft.trim();
+    const replyToId = replyingTo?.id;
     setDraft("");
+    setReplyingTo(null);
     setUploadPct(0);
     try {
       const uploaded = await uploadChatImage({ file, onProgress: setUploadPct });
-      const { message } = await sendChatMessage({ text: caption, imageId: uploaded.id, imageName: uploaded.name });
+      const { message } = await sendChatMessage({ text: caption, imageId: uploaded.id, imageName: uploaded.name, replyToId });
       setMessages((prev) => [...prev, message]);
     } catch (e) {
       setDraft(caption);
@@ -181,10 +391,41 @@ export function ChatWidget({ user, profiles }) {
   const onDelete = async (id) => {
     const before = messages;
     setMessages((prev) => prev.filter((m) => m.id !== id)); // optimistic
+    if (replyingTo?.id === id) setReplyingTo(null); // can't reply to what you just deleted
     try {
       await deleteChatMessage({ id });
     } catch (e) {
       setMessages(before); // put it back - the delete never actually happened
+    }
+  };
+
+  /**
+   * Optimistic toggle, matching the toggle the server itself does: tapping
+   * an emoji you already left removes it, otherwise it's added. A failure
+   * resyncs from the server rather than trying to hand-compute the exact
+   * rollback of a toggle.
+   */
+  const onReact = async (messageId, emoji) => {
+    const email = (user?.email || "").toLowerCase();
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const reactions = m.reactions || [];
+        const idx = reactions.findIndex((r) => r.emoji === emoji);
+        if (idx === -1) return { ...m, reactions: [...reactions, { emoji, count: 1, emails: [email] }] };
+        const r = reactions[idx];
+        const has = r.emails.includes(email);
+        const nextEmails = has ? r.emails.filter((e) => e !== email) : [...r.emails, email];
+        const nextReactions = nextEmails.length
+          ? reactions.map((rr, i) => (i === idx ? { ...rr, count: nextEmails.length, emails: nextEmails } : rr))
+          : reactions.filter((_, i) => i !== idx);
+        return { ...m, reactions: nextReactions };
+      })
+    );
+    try {
+      await reactToChatMessage({ messageId, emoji });
+    } catch (e) {
+      loadMessages(); // out of sync - just refetch rather than guess
     }
   };
 
@@ -276,61 +517,19 @@ export function ChatWidget({ user, profiles }) {
                     const displayName = mine ? "You" : profile?.name || m.name || m.email;
                     const canDelete = mine || isAdmin;
                     return (
-                      <div key={m.id} className={`group flex items-end gap-2 ${mine ? "flex-row-reverse" : "flex-row"}`}>
-                        {mine ? null : (
-                          <Avatar name={profile?.name || m.name || m.email} avatar={profile?.avatar} size={24} />
-                        )}
-                        <div className={`flex flex-col max-w-[75%] ${mine ? "items-end" : "items-start"}`}>
-                          <span className="text-[10px] text-muted-foreground mb-0.5">
-                            {displayName} · {timeAgo(m.at)}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {mine && canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => onDelete(m.id)}
-                                aria-label="Delete message"
-                                title="Delete"
-                                className="size-6 shrink-0 rounded-full grid place-items-center text-muted-foreground/60 hover:text-destructive transition-colors"
-                              >
-                                <Trash2 className="size-3" />
-                              </button>
-                            ) : null}
-                            <div
-                              className="rounded-2xl overflow-hidden"
-                              style={
-                                mine
-                                  ? { background: "var(--primary)", color: "var(--primary-foreground)" }
-                                  : { background: "var(--secondary)", color: "var(--foreground)" }
-                              }
-                            >
-                              {m.imageId ? (
-                                <a href={chatImageUrl({ fileId: m.imageId, size: 1600 })} target="_blank" rel="noopener noreferrer">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={chatImageUrl({ fileId: m.imageId, size: 500 })}
-                                    alt={m.imageName || "Shared image"}
-                                    loading="lazy"
-                                    className="block w-full max-h-64 object-cover"
-                                  />
-                                </a>
-                              ) : null}
-                              {m.text ? <p className="px-3 py-1.5 text-sm leading-snug break-words">{m.text}</p> : null}
-                            </div>
-                            {!mine && canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => onDelete(m.id)}
-                                aria-label="Delete message"
-                                title="Delete"
-                                className="size-6 shrink-0 rounded-full grid place-items-center text-muted-foreground/60 hover:text-destructive transition-colors"
-                              >
-                                <Trash2 className="size-3" />
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
+                      <ChatMessageRow
+                        key={m.id}
+                        m={m}
+                        mine={mine}
+                        displayName={displayName}
+                        avatarName={profile?.name || m.name || m.email}
+                        avatarPic={profile?.avatar}
+                        canDelete={canDelete}
+                        currentEmail={(user?.email || "").toLowerCase()}
+                        onDelete={() => onDelete(m.id)}
+                        onReply={() => setReplyingTo({ id: m.id, label: displayName, text: m.text, imageId: m.imageId })}
+                        onReact={(emoji) => onReact(m.id, emoji)}
+                      />
                     );
                   })
                 ) : (
@@ -355,9 +554,27 @@ export function ChatWidget({ user, profiles }) {
                 </div>
               ) : null}
 
+              {replyingTo ? (
+                <div className="shrink-0 flex items-center gap-2 px-3 pt-2 border-t border-border bg-secondary/30">
+                  <Reply className="size-3.5 text-muted-foreground shrink-0" />
+                  <div className="min-w-0 flex-1 text-xs">
+                    <span className="font-bold text-foreground">{replyingTo.label}</span>{" "}
+                    <span className="text-muted-foreground">{replyingTo.text || (replyingTo.imageId ? "📷 Photo" : "")}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    aria-label="Cancel reply"
+                    className="size-5 shrink-0 rounded-full grid place-items-center text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ) : null}
+
               <form
                 onSubmit={onSend}
-                className="shrink-0 flex items-center gap-1.5 p-3 border-t border-border"
+                className={`shrink-0 flex items-center gap-1.5 p-3 ${replyingTo ? "" : "border-t border-border"}`}
                 style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
               >
                 <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={onFilePicked} />
