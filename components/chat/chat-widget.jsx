@@ -417,21 +417,21 @@ export function ChatWidget({ user, profiles }) {
         </div>
       ) : null}
 
-      {/* The tab itself: not a flat semicircle flush against the edge, but
-          the edge's own silhouette pinching inward above and below a full
-          circular bulge that carries the icon - the same wave a boarding
-          pass cuts into its own edge to seat a QR corner. One SVG path
-          draws the whole wavy outline in one solid fill, so the curve is
-          exact rather than approximated with border-radius tricks. On
-          hover it noses further out (translateX) with a brief rotating
-          "nod" wobble layered on top (chatTabNod, triggered once per hover
-          via the class below and cleared on animationend so the next hover
-          plays it again) before settling into the pulled-out resting
-          position - see the matching keyframes in globals.css. Anchored
-          near the bottom, clear of the phone's fixed tab bar below md the
-          same way the toast is (see components/toast.jsx). Hidden while
-          the panel itself is open rather than turned into a close button,
-          since the panel already has its own. */}
+      {/* The tab itself: a solid pill welded to the edge (rounded only on
+          the side facing the page, flush and borderless on the side facing
+          off-screen), not a floating circular bubble - a hand-drawn wavy
+          outline was tried here and looked like an amorphous blob without
+          being able to see it live, so it's gone; this plain shape reads
+          correctly at a glance, which is what actually matters. On hover it
+          noses further out (translateX) with a brief rotating "nod" wobble
+          layered on top (chatTabNod, triggered once per hover via the class
+          below and cleared on animationend so the next hover plays it
+          again) before settling into the pulled-out resting position - see
+          the matching keyframes in globals.css. Anchored near the bottom,
+          clear of the phone's fixed tab bar below md the same way the toast
+          is (see components/toast.jsx). Hidden while the panel itself is
+          open rather than turned into a close button, since the panel
+          already has its own. */}
       {!open ? (
         <button
           type="button"
@@ -439,20 +439,13 @@ export function ChatWidget({ user, profiles }) {
           onMouseEnter={() => setNodding(true)}
           onAnimationEnd={() => setNodding(false)}
           aria-label="Open chat"
-          className={`fixed z-50 right-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-12 w-10 h-24 transition-transform duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-x-3 active:scale-95 ${nodding ? "chat-tab-nod" : ""}`}
+          className={`fixed z-50 right-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-12 flex items-center justify-center h-14 w-11 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-transform duration-[350ms] ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-x-2 active:scale-95 ${nodding ? "chat-tab-nod" : ""}`}
           style={{ transformOrigin: "right center" }}
         >
-          <svg viewBox="0 0 40 96" width="40" height="96" className="absolute inset-0 overflow-visible">
-            <path
-              d="M40,0 L40,96 L26,96 C26,88 32,84 30,78 C28,68 8,58 0,48 C8,38 28,28 30,18 C32,12 26,8 26,0 Z"
-              fill="var(--primary)"
-              className="drop-shadow-lg"
-            />
-          </svg>
-          <MessageCircle className="absolute size-4 text-primary-foreground" style={{ left: 3, top: 40 }} />
+          <MessageCircle className="size-5" />
           {pendingCount ? (
             <span
-              className="absolute top-3 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
+              className="absolute top-1 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
               style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
             >
               {pendingCount}

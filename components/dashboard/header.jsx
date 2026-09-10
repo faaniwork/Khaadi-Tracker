@@ -10,7 +10,6 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 const PAGE_TITLES = {
   activity: ["Activity", "Who changed what, tracked in real time"],
   access: ["Access & roles", "Manage who can view, edit, or manage this board"],
-  outputs: ["Khaadi PDPs", "Batches, collections and dresses - the images, nothing else"],
 };
 
 export function Crumb({ view, onBack }) {
@@ -26,9 +25,15 @@ export function Crumb({ view, onBack }) {
       </div>
     );
   }
-  // Browsing inside a batch: name the batch, not the section. "Khaadi PDPs"
-  // is true but useless once you are three levels into one.
-  if (view.page === "outputs" && view.batch) {
+  // Outputs gets nothing here at all, batch or no batch - it draws its own
+  // full breadcrumb and title inside OutputView regardless of how the
+  // dashboard's own view state was set (arriving via a batch card sets
+  // view.batch; arriving via the mode tab does not), so a title here could
+  // only ever repeat or lag behind what OutputView already shows the moment
+  // someone drills past the first level. See output-view.jsx's own crumb.
+  if (view.page === "outputs") return null;
+  if (PAGE_TITLES[view.page]) {
+    const [title, sub] = PAGE_TITLES[view.page];
     return (
       <div>
         <button
@@ -38,28 +43,6 @@ export function Crumb({ view, onBack }) {
         >
           <ArrowLeft className="size-4" /> All batches
         </button>
-        <h1 className="f-heading text-xl sm:text-2xl font-semibold tracking-[-0.01em] leading-tight text-foreground">
-          {view.batch}
-        </h1>
-      </div>
-    );
-  }
-  if (PAGE_TITLES[view.page]) {
-    const [title, sub] = PAGE_TITLES[view.page];
-    // Outputs is a sibling mode, not a page nested under the dashboard — the
-    // mode tabs above already do the job a "back" link would, so it does
-    // not get one.
-    return (
-      <div>
-        {view.page !== "outputs" ? (
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold mb-1 text-primary"
-          >
-            <ArrowLeft className="size-4" /> All batches
-          </button>
-        ) : null}
         <h1 className="f-heading text-xl sm:text-2xl font-semibold tracking-[-0.01em] leading-tight text-foreground">{title}</h1>
         <p className="text-sm mt-0.5 text-muted-foreground">{sub}</p>
       </div>
@@ -241,9 +224,11 @@ export function Header({
         onConfirm={() => signOut()}
         onCancel={() => setConfirmingSignOut(false)}
       />
-      <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pb-4 sm:pb-5">
-        <Crumb view={view} onBack={onBack} />
-      </div>
+      {view.page === "outputs" ? null : (
+        <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pb-4 sm:pb-5">
+          <Crumb view={view} onBack={onBack} />
+        </div>
+      )}
     </header>
   );
 }

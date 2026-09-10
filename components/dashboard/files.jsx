@@ -389,8 +389,8 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           on sm+ they still sit beside the title exactly as before. */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <ArrowLeft className="size-3.5" /> Back
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Back" title="Back">
+            <ArrowLeft className="size-4" />
           </Button>
           <div className="min-w-0">
             <h3 className="f-heading font-bold text-base text-foreground truncate">
@@ -416,9 +416,13 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               </option>
             ))}
           </Select>
+          {/* Labels drop below sm - four buttons' worth of text next to the
+              download/filter controls was most of what made this row read
+              as clutter on a phone; the icons alone are enough once you
+              already know this toolbar (title/tooltip covers a first visit). */}
           {trail.length ? (
-            <Button variant="ghost" size="sm" onClick={() => setTrail((t) => t.slice(0, -1))}>
-              <Folder className="size-3.5" /> Up
+            <Button variant="ghost" size="sm" onClick={() => setTrail((t) => t.slice(0, -1))} title="Up a folder">
+              <Folder className="size-3.5" /> <span className="hidden sm:inline">Up</span>
             </Button>
           ) : null}
           {canWrite ? (
@@ -429,11 +433,11 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               disabled={binBusy === "loading"}
               title="Files removed from this dress, and a way to put them back"
             >
-              <Trash2 className="size-3.5" /> {bin ? "Hide bin" : "Bin"}
+              <Trash2 className="size-3.5" /> <span className="hidden sm:inline">{bin ? "Hide bin" : "Bin"}</span>
             </Button>
           ) : null}
-          <Button variant="ghost" size="sm" onClick={() => load(currentFolder)} disabled={loading}>
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          <Button variant="ghost" size="sm" onClick={() => load(currentFolder)} disabled={loading} title="Refresh">
+            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} /> <span className="hidden sm:inline">Refresh</span>
           </Button>
         </div>
       </div>

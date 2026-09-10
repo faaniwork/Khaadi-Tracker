@@ -28,19 +28,26 @@ export function DownloadMenu({ dresses, showToast, disabled, className = "" }) {
   };
 
   return (
+    // A native select rather than a custom popover (see the file's own
+    // note above), which is exactly why this can't show an icon-and-nothing
+    // -else the way a real button can - the closed state is always some
+    // text. Kept as short as a select can go instead: a bare arrow, no
+    // "Download" label repeating what the arrow already says, in a small
+    // round footprint that reads as an icon button at a glance.
     <select
       value=""
       disabled={disabled || busy || !dresses?.length}
-      title="Download files from here"
+      title="Download"
+      aria-label="Download"
       onChange={(e) => {
         const v = e.target.value;
         e.target.value = "";
         if (v) run(v);
       }}
-      className={`rounded-xl border border-border bg-secondary text-foreground text-xs px-3 py-2 font-bold cursor-pointer outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-60 inline-flex items-center gap-1.5 ${className}`}
+      className={`appearance-none size-9 shrink-0 rounded-full border border-border bg-secondary text-foreground text-sm font-bold cursor-pointer outline-none text-center focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
     >
       <option value="" disabled>
-        {busy ? "Downloading…" : "⬇ Download"}
+        {busy ? "…" : "⬇"}
       </option>
       {OPTIONS.map((o) => (
         <option key={o.value} value={o.value}>
