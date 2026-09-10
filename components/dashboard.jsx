@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus } from "lucide-react";
-import { moodFor, mascotMessage, sortReleasesByRecency, RELEASE_LINKS } from "@/lib/constants";
+import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter } from "lucide-react";
+import { moodFor, mascotMessage, sortReleasesByRecency, RELEASE_LINKS, STATUS_OPTIONS } from "@/lib/constants";
 import {
   fetchBoard,
   saveDressField,
@@ -16,6 +16,7 @@ import {
   driveResync,
   fetchProfiles,
   createBatch,
+  deleteBatch,
 } from "@/lib/api";
 import { burstConfetti } from "@/lib/confetti-bus";
 import { ConfettiCanvas } from "@/components/confetti-canvas";
@@ -31,6 +32,7 @@ import { AccessPage } from "@/components/dashboard/access";
 import { OutputView } from "@/components/dashboard/output-view";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NewBatchDialog } from "@/components/dashboard/new-batch-dialog";
 
@@ -113,6 +115,7 @@ export function Dashboard({ user }) {
   const [pendingBulk, setPendingBulk] = useState(null);
   const [addingBatch, setAddingBatch] = useState(false);
   const [mascot, setMascot] = useState({ active: false, message: "" });
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [releaseFolders, setReleaseFolders] = useState({});
   const [revisions, setRevisions] = useState({ batches: {} });
 
@@ -203,7 +206,7 @@ export function Dashboard({ user }) {
       } catch (e) {
         console.error("load failed", e);
         setLive(false);
-        if (!silent) showToast("Could not reach the sheet — retrying…", "error");
+        if (!silent) showToast("Could not reach the sheet - retrying…", "error");
       } finally {
         inFlight.current = false;
       }
@@ -277,7 +280,7 @@ export function Dashboard({ user }) {
   const onFieldChange = useCallback(
     (folderId, field, value) => {
       if (!canEdit) {
-        showToast("View-only access — ask an admin to make you an editor", "error");
+        showToast("View-only access - ask an admin to make you an editor", "error");
         return;
       }
       const nextValue =
@@ -308,7 +311,7 @@ export function Dashboard({ user }) {
           });
           if (res && res.conflict) {
             setDot(key, "error");
-            showToast("Someone else changed this dress — click the dot to retry and overwrite their change.", "error");
+            showToast("Someone else changed this dress - click the dot to retry and overwrite their change.", "error");
             return;
           }
           lastUpdatedAt.current[folderId] = res.updatedAt;
@@ -320,7 +323,7 @@ export function Dashboard({ user }) {
         } catch (e) {
           console.error("save failed", e);
           setDot(key, "error");
-          showToast("Save failed — click the dot to retry", "error");
+          showToast("Save failed - click the dot to retry", "error");
         }
       };
 
@@ -362,7 +365,7 @@ export function Dashboard({ user }) {
         setTimeout(() => setDot(key, "idle"), 1200);
       } catch (e) {
         setDot(key, "error");
-        showToast("Save failed — click the dot to retry", "error");
+        showToast("Save failed - click the dot to retry", "error");
       }
     },
     [rows, setDot, showToast]
@@ -373,7 +376,7 @@ export function Dashboard({ user }) {
   const onCostChange = useCallback(
     (scope, key, value) => {
       if (!canEdit) {
-        showToast("View-only access — ask an admin to make you an editor", "error");
+        showToast("View-only access - ask an admin to make you an editor", "error");
         return;
       }
       const n = Number(value) || 0;
@@ -394,7 +397,7 @@ export function Dashboard({ user }) {
         } catch (e) {
           console.error("cost save failed", e);
           setDot(syncKey, "error");
-          showToast("Save failed — click the dot to retry", "error");
+          showToast("Save failed - click the dot to retry", "error");
         }
       }, 600);
     },
@@ -416,7 +419,7 @@ export function Dashboard({ user }) {
         setTimeout(() => setDot(syncKey, "idle"), 1200);
       } catch (e) {
         setDot(syncKey, "error");
-        showToast("Save failed — click the dot to retry", "error");
+        showToast("Save failed - click the dot to retry", "error");
       }
     },
     [costs, setDot, showToast]
@@ -465,7 +468,7 @@ export function Dashboard({ user }) {
       showToast(`Updated ${targets.length} dresses to ${status}`);
     } catch (e) {
       console.error("bulk save failed", e);
-      showToast("Bulk save failed — try again", "error");
+      showToast("Bulk save failed - try again", "error");
     }
   }, [rows, user, showToast]);
 
@@ -495,7 +498,7 @@ export function Dashboard({ user }) {
   const onAddNote = useCallback(
     async (release, text) => {
       if (!canEdit) {
-        showToast("View-only access — ask an admin to make you an editor", "error");
+        showToast("View-only access - ask an admin to make you an editor", "error");
         return;
       }
       const stamp = user?.name || user?.email || "Someone";
@@ -508,7 +511,7 @@ export function Dashboard({ user }) {
         showToast("Note added");
       } catch (e) {
         console.error("note save failed", e);
-        showToast("Save failed — retry", "error");
+        showToast("Save failed - retry", "error");
       }
     },
     [canEdit, user, showToast]
@@ -525,7 +528,7 @@ export function Dashboard({ user }) {
   const onRenameCollection = useCallback(
     async (release, oldName, newName) => {
       if (!canEdit) {
-        showToast("View-only access — ask an admin to make you an editor", "error");
+        showToast("View-only access - ask an admin to make you an editor", "error");
         return;
       }
       try {
@@ -548,7 +551,7 @@ export function Dashboard({ user }) {
     setSheetSyncing(true);
     try {
       const res = await syncToSheet();
-      showToast(`Sheet updated — ${res.rows} rows`);
+      showToast(`Sheet updated - ${res.rows} rows`);
     } catch (e) {
       console.error("sheet sync failed", e);
       showToast(e.message || "Sheet sync failed", "error");
@@ -577,7 +580,7 @@ export function Dashboard({ user }) {
         const skipped = res.skipped?.length
           ? ` Skipped ${res.skipped.length} folder${res.skipped.length === 1 ? "" : "s"} that don't look like dresses.`
           : "";
-        showToast(`Drive check done — ${res.text}.${skipped}`, "ok");
+        showToast(`Drive check done - ${res.text}.${skipped}`, "ok");
         await loadData(true);
       } catch (e) {
         showToast(e.message || "Could not read Drive", "error");
@@ -602,7 +605,7 @@ export function Dashboard({ user }) {
       const res = await createBatch({ name, date, collections });
       setAddingBatch(false);
       showToast(
-        `Created ${res.dresses} dress folder${res.dresses === 1 ? "" : "s"} in ${name} — reading them back…`,
+        `Created ${res.dresses} dress folder${res.dresses === 1 ? "" : "s"} in ${name} - reading them back…`,
         "ok"
       );
       try {
@@ -630,6 +633,26 @@ export function Dashboard({ user }) {
     },
     [rows]
   );
+
+  const confirmDeleteBatch = useCallback(async () => {
+    const target = pendingDelete;
+    setPendingDelete(null);
+    if (!target) return;
+    try {
+      const res = await deleteBatch({ release: target.release, trashFolder: true });
+      const folder =
+        res.folder === "trashed"
+          ? "Its Drive folder is in your trash."
+          : res.folder === "refused"
+            ? "Drive would not let us trash its folder, so that is still there."
+            : "Its Drive folder was left alone.";
+      showToast(`${target.release} removed - ${res.archived} dresses archived. ${folder}`);
+      setView({ page: "overview", batch: null });
+      await loadData(true);
+    } catch (e) {
+      showToast(e.message || "Could not delete that batch", "error");
+    }
+  }, [pendingDelete, showToast, loadData]);
 
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
@@ -669,6 +692,10 @@ export function Dashboard({ user }) {
 
   // ---------- derived data ----------
   const releases = useMemo(() => releasesPresent(rows), [rows]);
+  const visibleReleases = useMemo(() => {
+    if (!statusFilter) return releases;
+    return releases.filter((rel) => rowsFor(rows, rel).some((r) => r.status === statusFilter));
+  }, [releases, rows, statusFilter]);
   const navItems = useMemo(() => {
     const items = [
       { id: "overview", label: "All" },
@@ -704,7 +731,7 @@ export function Dashboard({ user }) {
   }, [failedKeys, retryRow, retryCost]);
   const syncSummary = failedKeys.length
     ? {
-        text: `${failedKeys.length} change${failedKeys.length > 1 ? "s" : ""} not saved — click to retry`,
+        text: `${failedKeys.length} change${failedKeys.length > 1 ? "s" : ""} not saved - click to retry`,
         kind: "error",
         onClick: retryAllFailed,
       }
@@ -739,7 +766,7 @@ export function Dashboard({ user }) {
             </button>
           </div>
         </header>
-        <main className="p-4 sm:p-6">
+        <main className="w-full max-w-[1600px] mx-auto px-6 lg:px-10 py-6">
           <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
         </main>
         <Toast {...toast} />
@@ -747,7 +774,7 @@ export function Dashboard({ user }) {
     );
   }
 
-  const searching = search.trim() || statusFilter;
+  const searching = Boolean(search.trim());
   // A batch stays lit in the sidebar whether you are browsing its images or
   // in its tools.
   const activeNavId = view.batch || view.page;
@@ -767,17 +794,11 @@ export function Dashboard({ user }) {
           syncSummary={syncSummary}
           search={search}
           onSearch={setSearch}
-          statusFilter={statusFilter}
-          onStatusFilter={setStatusFilter}
           theme={theme}
           onToggleTheme={onToggleTheme}
           user={user}
-          onSyncSheet={onSyncSheet}
-          sheetSyncing={sheetSyncing}
           myAvatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
           onEditProfile={() => setEditingProfile(true)}
-          canEdit={canEdit}
-          onAddBatch={() => setAddingBatch(true)}
         />
         {/* On a wide screen the overview pins its summary and lets only the
             batch grid scroll, since the grid is the part that grows without
@@ -785,7 +806,7 @@ export function Dashboard({ user }) {
             charts. On a phone that would leave no room for the cards at all,
             so there the whole page scrolls as before. */}
         <main
-          className={`flex-1 min-h-0 flex flex-col max-w-[1280px] w-full mx-auto px-5 sm:px-8 pt-6 ${
+          className={`flex-1 min-h-0 flex flex-col w-full max-w-[1600px] mx-auto px-6 lg:px-10 pt-6 ${
             !searching && view.page === "overview"
               ? "overflow-y-auto lg:overflow-hidden pb-16 lg:pb-0"
               : "overflow-y-auto scrollbar-thin pb-16"
@@ -795,8 +816,7 @@ export function Dashboard({ user }) {
             <SearchResults
               rows={rows}
               search={search}
-              statusFilter={statusFilter}
-              canEdit={canEdit}
+                  canEdit={canEdit}
               sync={sync}
               onFieldChange={onFieldChange}
               onRetry={retryRow}
@@ -810,25 +830,42 @@ export function Dashboard({ user }) {
                 onMascotClick={onMascotClick}
               />
               <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
-              {releases.length ? (
-                <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto scrollbar-thin -mx-1 px-1 lg:pb-16">
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <h2 className="f-heading text-sm font-semibold text-foreground">
+                  Batches
+                  {statusFilter ? (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}
+                      · {visibleReleases.length} with {statusFilter.toLowerCase()}
+                    </span>
+                  ) : null}
+                </h2>
+                {canEdit ? (
+                  <Button size="sm" variant="ghost" onClick={() => setAddingBatch(true)}>
+                    <Plus className="size-3.5" /> Add batch
+                  </Button>
+                ) : null}
+                <div className="ml-auto flex items-center gap-1.5">
+                  <Filter className="size-3.5 text-muted-foreground" />
+                  <Select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="text-xs"
+                    aria-label="Show only batches containing this status"
+                  >
+                    <option value="">Any status</option>
+                    {STATUS_OPTIONS.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+              {visibleReleases.length ? (
+                <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto scrollbar-thin scroll-section -mx-1 px-1 pt-1 lg:pb-16">
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
-                    {/* Sat in the header alone and went unfound twice, so it
-                        is also here, in the grid it adds to — a dashed slot
-                        where the next batch will appear reads as "the next
-                        one goes here" in a way a toolbar button does not. */}
-                    {canEdit ? (
-                      <button
-                        type="button"
-                        onClick={() => setAddingBatch(true)}
-                        className="rounded-[14px] border border-dashed border-border text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors min-h-[140px] flex flex-col items-center justify-center gap-2"
-                      >
-                        <Plus className="size-5" />
-                        <span className="f-heading text-sm font-semibold">Add a batch</span>
-                        <span className="text-xs">Creates the folders in Drive</span>
-                      </button>
-                    ) : null}
-                    {releases.slice(0, visibleBatches).map((rel) => {
+                    {visibleReleases.slice(0, visibleBatches).map((rel) => {
                       const rr = rowsFor(rows, rel);
                       const cols = collectionsFor(rows, rel);
                       const noteCount = (notes.batches && notes.batches[rel] || []).length;
@@ -851,18 +888,24 @@ export function Dashboard({ user }) {
                           onCostRetry={retryCost}
                           onRevisionsChange={onRevisionsChange}
                           onAddNote={onAddNote}
+                          onDelete={
+                            role === "admin"
+                              ? (name) =>
+                                  setPendingDelete({ release: name, dresses: rowsFor(rows, name).length })
+                              : undefined
+                          }
                         />
                       );
                     })}
                   </div>
-                  {releases.length > visibleBatches ? (
+                  {visibleReleases.length > visibleBatches ? (
                     <div className="flex justify-center mt-5">
                       <button
                         type="button"
                         onClick={() => setVisibleBatches((n) => n + BATCHES_PER_PAGE)}
                         className="rounded-xl bg-secondary border border-border text-foreground text-xs px-4 py-2.5 font-bold"
                       >
-                        Show more batches ({releases.length - visibleBatches} more)
+                        Show more batches ({visibleReleases.length - visibleBatches} more)
                       </button>
                     </div>
                   ) : null}
@@ -930,6 +973,18 @@ export function Dashboard({ user }) {
         </main>
       </div>
 
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        title={pendingDelete ? `Delete ${pendingDelete.release}?` : ""}
+        description={
+          pendingDelete
+            ? `Its ${pendingDelete.dresses} dress${pendingDelete.dresses === 1 ? "" : "es"} are archived, not destroyed - statuses and review history survive. Its Drive folder goes to your trash if Drive lets us.`
+            : ""
+        }
+        confirmLabel="Delete batch"
+        onConfirm={confirmDeleteBatch}
+        onCancel={() => setPendingDelete(null)}
+      />
       <NewBatchDialog
         open={addingBatch}
         onClose={() => setAddingBatch(false)}

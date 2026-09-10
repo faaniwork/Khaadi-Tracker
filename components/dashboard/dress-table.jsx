@@ -39,7 +39,7 @@ export function DressRow({ row, disabled, syncState, onFieldChange, onRetry, onO
       </td>
       <td className="py-3 px-4">
         <StatusSelect
-          value={row.status || "Not Started"}
+          value={row.status || "In Progress"}
           disabled={disabled}
           onChange={(v) => onFieldChange(row.id, "status", v)}
         />
@@ -54,7 +54,7 @@ export function DressRow({ row, disabled, syncState, onFieldChange, onRetry, onO
           className="f-mono text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5 rounded-lg px-1.5 py-1 -mx-1.5 hover:bg-secondary transition-colors"
         >
           <Images className="size-3.5" />
-          {row.files != null ? row.files : "—"} files
+          {row.files != null ? row.files : "-"} files
         </button>
       </td>
       <td className="py-3 px-4">
@@ -264,7 +264,7 @@ export function NotesCard({ rel, list, canEdit, onAddNote }) {
           ))
         ) : (
           <p className="text-sm py-1 text-muted-foreground">
-            No notes yet — add context on delays, revisions or cancellations below.
+            No notes yet - add context on delays, revisions or cancellations below.
           </p>
         )}
       </div>
@@ -283,7 +283,7 @@ export function NotesCard({ rel, list, canEdit, onAddNote }) {
           name="noteText"
           type="text"
           disabled={!canEdit}
-          placeholder="Add a note — e.g. why a piece was cancelled…"
+          placeholder="Add a note - e.g. why a piece was cancelled…"
           className="flex-1 min-w-[200px]"
         />
         <Button type="submit" size="sm" disabled={!canEdit}>

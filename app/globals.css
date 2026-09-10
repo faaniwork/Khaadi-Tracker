@@ -200,5 +200,34 @@ body {
 .mascot-rider:hover .mascot-bubble, .mascot-rider:focus-within .mascot-bubble, .mascot-bubble.is-shown { opacity: 1; transform: translate(-50%,0) scale(1); pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .mascot-svg { animation: none; } .mascot-rider { opacity: 1; transition: none; } }
 
+/* A scroll region that reads as a section rather than as content being
+   sliced off. The mask fades the first and last few pixels, so a card
+   crossing the boundary looks like it is passing behind an edge instead of
+   being cut by one — which is exactly how a hard clip reads. overscroll
+   containment stops a flick at the end of the list from scrolling the page
+   behind it, and smooth behaviour applies to keyboard and programmatic
+   jumps. */
+.scroll-section {
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 14px,
+    #000 calc(100% - 14px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 14px,
+    #000 calc(100% - 14px),
+    transparent 100%
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-section { scroll-behavior: auto; }
+}
+
 .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }

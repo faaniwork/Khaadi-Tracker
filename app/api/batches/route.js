@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { createFolder, getParentFolderId, mapWithConcurrency } from '@/lib/drive';
+import { createFolder, getParentFolderId, mapWithConcurrency, trashFile } from '@/lib/drive';
 import { getUserDriveAccessToken } from '@/lib/googleUserToken';
 import {
   assertReleaseNameFree,
   createReleaseRecord,
+  deleteRelease,
   getMyRole,
+  getReleaseFolderId,
   getReleaseFolderMap,
 } from '@/lib/db';
 import { RELEASE_LINKS, driveFolderIdFromUrl, looksLikeDressFolder } from '@/lib/constants';
@@ -180,5 +182,61 @@ export async function POST(req) {
     const status = e?.status || (e?.code === 'VIEW_ONLY' ? 403 : 500);
     if (status >= 500) console.error('batch create failed', e);
     return NextResponse.json({ error: e.message || 'Could not create that batch' }, { status });
+  }
+}
+
+/**
+ * DELETE /api/batches   { release, trashFolder }
+ *
+ * Admins only. Takes the batch off the board, archiving its dresses rather
+ * than destroying them — their statuses and review history are a record of
+ * work that happened, and it survives so a mis-click is recoverable.
+ *
+ * `trashFolder` additionally sends the Drive folder to the trash, as the
+ * ADMIN rather than as the service account: in this Drive only an owner may
+ * trash, so this works for folders the app created for them and is refused
+ * for the ones it does not own. A refusal is reported rather than thrown —
+ * the batch is off the board either way, and the caller deserves to know the
+ * folder is still sitting there.
+ */
+export async function DELETE(req) {
+  try {
+    const session = await auth();
+    if (!session) return bad('UNAUTHENTICATED', 401);
+    const email = session.user?.email || '';
+    const role = await getMyRole(email);
+    if (role !== 'admin') return bad('Only admins can delete a batch.', 403);
+
+    const { release, trashFolder } = await req.json();
+    const name = String(release || '').trim();
+    if (!name) return bad('Which batch?');
+
+    const folderId = trashFolder ? await getReleaseFolderId(name) : '';
+    const result = await deleteRelease({
+      email,
+      release: name,
+      by: session.user?.name || email,
+    });
+
+    let folder = 'kept';
+    if (trashFolder) {
+      if (!folderId) {
+        folder = 'unknown';
+      } else {
+        try {
+          const accessToken = await getUserDriveAccessToken();
+          await trashFile(folderId, accessToken);
+          folder = 'trashed';
+        } catch (e) {
+          console.error('batch folder trash refused', e);
+          folder = 'refused';
+        }
+      }
+    }
+    return NextResponse.json({ ...result, folder });
+  } catch (e) {
+    const status = e?.status || (e?.code === 'ADMIN_ONLY' ? 403 : 500);
+    if (status >= 500) console.error('batch delete failed', e);
+    return NextResponse.json({ error: e.message || 'Could not delete that batch' }, { status });
   }
 }

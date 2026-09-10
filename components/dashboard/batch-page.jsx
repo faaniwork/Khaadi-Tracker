@@ -81,8 +81,8 @@ export function BatchPage({
             </p>
             <div className="mt-2 max-w-[360px]">
               <div className="flex rounded-full overflow-hidden bg-muted" style={{ height: 8 }}>
-                {["Delivered", "In Progress", "Needs Revision", "Not Started", "Discarded"].map((s) => {
-                  const n = rows.filter((r) => (r.status || "Not Started") === s).length;
+                {["Delivered", "In Progress", "Needs Revision", "Discarded"].map((s) => {
+                  const n = rows.filter((r) => (r.status || "In Progress") === s).length;
                   if (!n) return null;
                   const colorMap = {
                     Delivered: "var(--good)",
@@ -142,7 +142,7 @@ export function BatchPage({
             <p className="text-[10.5px] text-muted-foreground basis-full">
               Drive checked {timeAgo(driveSync.at)}
               {driveSync.by ? ` by ${driveSync.by}` : ""}
-              {driveSync.summary ? ` — ${driveSync.summary}` : ""}
+              {driveSync.summary ? ` - ${driveSync.summary}` : ""}
             </p>
           ) : (
             <p className="text-[10.5px] text-muted-foreground basis-full">

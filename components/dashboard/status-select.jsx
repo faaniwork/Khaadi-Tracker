@@ -17,7 +17,7 @@ export function StatusSelect({ value, disabled, onChange }) {
       onChange={(e) => onChange(e.target.value)}
       className="chip f-mono text-[11px] font-bold px-3 py-1.5 border-0 cursor-pointer rounded-full disabled:cursor-not-allowed disabled:opacity-70"
       style={{ background: style.bg, color: style.fg }}
-      title={disabled ? "View-only access — ask an admin for editor access" : undefined}
+      title={disabled ? "View-only access - ask an admin for editor access" : undefined}
     >
       {STATUS_OPTIONS.map((o) => (
         <option key={o} value={o}>

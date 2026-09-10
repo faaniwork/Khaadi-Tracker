@@ -43,7 +43,7 @@ function NavButton({ it, isActive, onNav }) {
     <button
       type="button"
       onClick={() => onNav(it.id)}
-      title={it.discarded ? `${it.label} — all discarded` : it.label}
+      title={it.discarded ? `${it.label} - all discarded` : it.label}
       className="flex flex-col items-center gap-1 py-2 w-full rounded-xl transition-transform hover:-translate-y-px"
     >
       <NavRing id={it.id} pct={it.pct} icon={it.icon} discarded={it.discarded} />

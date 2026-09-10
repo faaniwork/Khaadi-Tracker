@@ -3,7 +3,7 @@ import { DressRow } from "./dress-table";
 export function SearchResults({ rows, search, statusFilter, canEdit, sync, onFieldChange, onRetry }) {
   const term = search.trim().toLowerCase();
   const filtered = rows.filter((r) => {
-    if (statusFilter && (r.status || "Not Started") !== statusFilter) return false;
+    if (statusFilter && (r.status || "In Progress") !== statusFilter) return false;
     if (!term) return true;
     return [r.release, r.collection, r.dress].some((v) => String(v || "").toLowerCase().includes(term));
   });
@@ -11,7 +11,7 @@ export function SearchResults({ rows, search, statusFilter, canEdit, sync, onFie
   if (!filtered.length) {
     return (
       <div className="rounded-[14px] border border-border bg-card p-10 text-center text-sm text-muted-foreground">
-        No dresses match — try a different search.
+        No dresses match - try a different search.
       </div>
     );
   }

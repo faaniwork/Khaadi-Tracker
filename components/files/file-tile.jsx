@@ -211,7 +211,7 @@ export function FileTile({
         {status === "rejected" && review?.reason ? (
           <p className="text-[11px] leading-snug border-l-2 pl-2" style={{ borderColor: "var(--destructive)", color: "var(--destructive)" }}>
             <span className="font-bold">{REASON_LABEL[review.reason] || review.reason}</span>
-            {review.text ? ` — ${review.text}` : ""}
+            {review.text ? ` - ${review.text}` : ""}
           </p>
         ) : null}
 
@@ -222,7 +222,7 @@ export function FileTile({
                 type="button"
                 disabled={busy}
                 onClick={() => onApprove?.(file)}
-                title={status === "approved" ? "Approved — click to clear" : "Approve"}
+                title={status === "approved" ? "Approved - click to clear" : "Approve"}
                 aria-label="Approve"
                 className="p-1 -m-1 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
                 style={{ color: status === "approved" ? "var(--good)" : "var(--muted-foreground)" }}
@@ -233,7 +233,7 @@ export function FileTile({
                 type="button"
                 disabled={busy}
                 onClick={() => onReject?.(file)}
-                title={status === "rejected" ? "Rejected — click to change the reason" : "Reject"}
+                title={status === "rejected" ? "Rejected - click to change the reason" : "Reject"}
                 aria-label="Reject"
                 className="p-1 -m-1 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
                 style={{ color: status === "rejected" ? "var(--destructive)" : "var(--muted-foreground)" }}
@@ -255,7 +255,7 @@ export function FileTile({
           </button>
 
           {/* Drive is where the team manages files, not where a client
-              should ever need to go — this stays admin/editor only. */}
+              should ever need to go - this stays admin/editor only. */}
           {file.webViewLink && canWrite ? (
             <a
               href={file.webViewLink}

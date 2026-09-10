@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, ChevronRight, Check, Ban, Repeat2 } from "lucide-react";
+import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, ChevronRight, Check, Ban, Repeat2, Trash2 } from "lucide-react";
 import { fmt, shortRelease, MILESTONE_TARGET, RELEASE_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 import { Input } from "@/components/ui/input";
@@ -228,6 +228,7 @@ export function BatchCard({
   onCostRetry,
   onRevisionsChange,
   onAddNote,
+  onDelete,
 }) {
   const delivered = rr.filter((r) => r.status === "Delivered").length;
   const discarded = rr.filter((r) => r.status === "Discarded").length;
@@ -302,6 +303,17 @@ export function BatchCard({
           >
             <DriveIcon className="size-4" />
           </a>
+        ) : null}
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={() => onDelete(rel)}
+            title="Delete this batch"
+            aria-label={`Delete ${rel}`}
+            className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
         ) : null}
       </div>
       <CardNotes list={notes} canEdit={canEdit} onAddNote={(text) => onAddNote(rel, text)} />

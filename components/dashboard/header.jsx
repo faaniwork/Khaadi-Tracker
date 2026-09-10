@@ -1,15 +1,15 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { Search, Sun, Moon, ArrowLeft, LogOut, FileSpreadsheet, Plus } from "lucide-react";
-import { Input, Select } from "@/components/ui/input";
+import { Search, Sun, Moon, ArrowLeft, LogOut } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 
 const PAGE_TITLES = {
   activity: ["Activity", "Who changed what, tracked in real time"],
   access: ["Access & roles", "Manage who can view, edit, or manage this board"],
-  outputs: ["Khaadi PDPs", "Batches, collections and dresses — the images, nothing else"],
+  outputs: ["Khaadi PDPs", "Batches, collections and dresses - the images, nothing else"],
 };
 
 export function Crumb({ view, onBack }) {
@@ -20,7 +20,7 @@ export function Crumb({ view, onBack }) {
           Production Board
         </h1>
         <p className="text-sm mt-0.5 text-muted-foreground">
-          Khaadi × ImagineArt PDP shoot — every batch, tracked live
+          Khaadi × ImagineArt PDP shoot - every batch, tracked live
         </p>
       </div>
     );
@@ -81,10 +81,11 @@ export function Crumb({ view, onBack }) {
 }
 
 /**
- * The two halves of the app, as an actual tab pair rather than one more icon
- * lost in the sidebar's stack of batch rings. Underlined, not boxed — this
- * sits above everything else here, so it reads as a mode switch, not a
- * page action.
+ * The two halves of the app.
+ *
+ * A filled pill rather than an underline: the underline sat directly above
+ * the header's own border, so the top of every page had two horizontal rules
+ * a few pixels apart doing the same job badly. A pill needs no rule at all.
  */
 function ModeTabs({ mode, onNav }) {
   const tabs = [
@@ -92,20 +93,25 @@ function ModeTabs({ mode, onNav }) {
     { id: "outputs", label: "Khaadi PDPs", nav: "outputs" },
   ];
   return (
-    <nav className="flex items-center gap-6 -mb-px">
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          onClick={() => onNav(t.nav)}
-          className={`f-heading text-sm font-medium pb-2.5 border-b-2 transition-colors ${
-            mode === t.id ? "text-foreground" : "text-muted-foreground border-transparent hover:text-foreground"
-          }`}
-          style={mode === t.id ? { borderColor: "var(--primary)" } : undefined}
-        >
-          {t.label}
-        </button>
-      ))}
+    <nav className="flex items-center gap-1 rounded-full bg-secondary/70 p-1">
+      {tabs.map((t) => {
+        const active = mode === t.id;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onNav(t.nav)}
+            aria-current={active ? "page" : undefined}
+            className={`f-heading text-[13px] font-semibold px-3.5 py-1.5 rounded-full transition-all duration-200 ${
+              active
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        );
+      })}
     </nav>
   );
 }
@@ -119,30 +125,19 @@ export function Header({
   syncSummary,
   search,
   onSearch,
-  statusFilter,
-  onStatusFilter,
   theme,
   onToggleTheme,
   user,
-  onSyncSheet,
-  sheetSyncing,
   myAvatar,
   onEditProfile,
-  canEdit,
-  onAddBatch,
 }) {
   const viewOnly = role !== "admin" && role !== "editor";
   const mode = view.page === "outputs" ? "outputs" : "dashboard";
   return (
-    <header className="sticky top-0 z-20 backdrop-blur border-b border-border bg-card/90">
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 pt-5 sm:pt-6 border-b border-border/60">
+    <header className="sticky top-0 z-20 backdrop-blur border-b border-border bg-background/85">
+      <div className="w-full max-w-[1600px] mx-auto px-6 lg:px-10 flex items-center gap-3 h-14">
         <ModeTabs mode={mode} onNav={onNav} />
-      </div>
-      <div className="max-w-[1280px] mx-auto px-5 sm:px-8 py-4 flex items-center gap-3 flex-wrap">
-        <div className="flex-1 min-w-[200px]">
-          <Crumb view={view} onBack={onBack} />
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="ml-auto flex items-center gap-2">
           <span
             title={live ? "Synced with the Tracker sheet" : "Having trouble reaching the sheet"}
             className="size-2.5 rounded-full shrink-0"
@@ -175,33 +170,6 @@ export function Header({
               className="pl-9 pr-3 py-2 w-[220px]"
             />
           </div>
-          {mode === "outputs" ? null : (
-            <Select value={statusFilter} onChange={(e) => onStatusFilter(e.target.value)}>
-              <option value="">All statuses</option>
-              <option>Not Started</option>
-              <option>In Progress</option>
-              <option>Delivered</option>
-              <option>Needs Revision</option>
-              <option>Discarded</option>
-            </Select>
-          )}
-          {role === "admin" ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onSyncSheet}
-              disabled={sheetSyncing}
-              aria-label="Sync a snapshot to the Google Sheet"
-              title="Sync a snapshot to the Google Sheet"
-            >
-              <FileSpreadsheet className={`size-4 ${sheetSyncing ? "animate-pulse" : ""}`} />
-            </Button>
-          ) : null}
-          {canEdit && onAddBatch ? (
-            <Button size="sm" onClick={onAddBatch}>
-              <Plus className="size-3.5" /> Add batch
-            </Button>
-          ) : null}
           <Button
             variant="ghost"
             size="icon"
@@ -228,12 +196,15 @@ export function Header({
               type="button"
               onClick={() => signOut()}
               title="Sign out"
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <LogOut className="size-3.5" />
             </button>
           </div>
         </div>
+      </div>
+      <div className="w-full max-w-[1600px] mx-auto px-6 lg:px-10 pb-5">
+        <Crumb view={view} onBack={onBack} />
       </div>
     </header>
   );

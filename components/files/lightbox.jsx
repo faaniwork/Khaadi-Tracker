@@ -290,7 +290,7 @@ export function Lightbox({
         />
       </div>
 
-      {/* Bottom bar: never shrinks either, and sits below the image band —
+      {/* Bottom bar: never shrinks either, and sits below the image band -
           reviewing an image never means covering it to do so. */}
       <div className="shrink-0 border-t border-white/10 bg-black/40 px-4 py-3">
         {status === "rejected" && review?.text ? (
@@ -341,7 +341,7 @@ export function Lightbox({
                 {fileComments.map((c) => (
                   <p key={c.id} className="text-[11px] text-white/80">
                     <span className="font-bold text-white">{c.by}</span>{" "}
-                    <span className="text-white/50">· {timeAgo(c.at)}</span> — {c.text}
+                    <span className="text-white/50">· {timeAgo(c.at)}</span> - {c.text}
                   </p>
                 ))}
               </div>

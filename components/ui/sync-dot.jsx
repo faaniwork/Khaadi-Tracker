@@ -6,7 +6,7 @@ export function SyncDot({ state = "idle", onRetry, title }) {
     state === "saving"
       ? "Saving…"
       : state === "error"
-      ? "Failed to save — click to retry"
+      ? "Failed to save - click to retry"
       : state === "saved"
       ? "Saved"
       : title || "";

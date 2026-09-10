@@ -144,7 +144,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     if (!ok) {
       showToast?.(lastError || "Upload failed", "error");
     } else if (failed) {
-      showToast?.(`Uploaded ${ok} of ${files.length} — ${failed} failed: ${lastError}`, "error");
+      showToast?.(`Uploaded ${ok} of ${files.length} - ${failed} failed: ${lastError}`, "error");
     } else {
       showToast?.(`Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`, "ok");
     }
@@ -393,7 +393,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           ) : (
             <>
               <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground mb-2">
-                Removed — {bin.length} file{bin.length === 1 ? "" : "s"}
+                Removed - {bin.length} file{bin.length === 1 ? "" : "s"}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                 {bin.map((f) => (
@@ -493,7 +493,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       <ConfirmDialog
         open={Boolean(confirmTrash)}
         title="Remove this file?"
-        description={`"${confirmTrash?.name || ""}" — it stays in Drive.`}
+        description={`"${confirmTrash?.name || ""}" - it stays in Drive.`}
         confirmLabel="Remove"
         onConfirm={doTrash}
         onCancel={() => setConfirmTrash(null)}

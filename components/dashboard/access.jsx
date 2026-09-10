@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { fetchAccess, saveAccess, deleteAccess } from "@/lib/api";
 
 const ROLE_HINT = {
-  admin: "Full access — can edit everything and manage who has access.",
+  admin: "Full access - can edit everything and manage who has access.",
   editor: "Can edit statuses, comments and credits on the dashboard.",
-  viewer: "Read-only — sees everything live but can't make changes.",
-  client: "Outputs only — can browse batches and approve or reject images, nothing else.",
+  viewer: "Read-only - sees everything live but can't make changes.",
+  client: "Outputs only - can browse batches and approve or reject images, nothing else.",
 };
 
 export function AccessPage({ role, currentEmail, showToast }) {
@@ -138,7 +138,7 @@ export function AccessPage({ role, currentEmail, showToast }) {
       ) : list === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : !list.length ? (
-        <p className="text-sm text-muted-foreground">No one has explicit access yet — everyone defaults to viewer.</p>
+        <p className="text-sm text-muted-foreground">No one has explicit access yet - everyone defaults to viewer.</p>
       ) : (
         <div className="overflow-x-auto scrollbar-thin">
           <table className="w-full border-collapse">
@@ -174,7 +174,7 @@ export function AccessPage({ role, currentEmail, showToast }) {
                     </Select>
                   </td>
                   <td className="py-2.5 px-3 text-xs text-muted-foreground max-w-[220px] truncate" title={r.notes}>
-                    {r.notes || "—"}
+                    {r.notes || "-"}
                   </td>
                   <td className="py-2.5 px-3">
                     <button

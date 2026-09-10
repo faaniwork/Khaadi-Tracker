@@ -138,7 +138,7 @@ export function OutputView({
   // up as long as at least one of its dresses matches, so narrowing to
   // "Needs Revision" surfaces exactly the batches that need attention
   // instead of hiding everything down to an empty screen.
-  const matches = (r) => !statusFilter || (r.status || "Not Started") === statusFilter;
+  const matches = (r) => !statusFilter || (r.status || "In Progress") === statusFilter;
 
   const releases = useMemo(() => {
     const set = [...new Set(rows.filter(matches).map((r) => r.release || "Unsorted"))];
@@ -253,7 +253,7 @@ export function OutputView({
               key={r.id}
               coverDressId={r.id}
               title={r.dress}
-              subtitle={`${r.files != null ? r.files : "—"} files`}
+              subtitle={`${r.files != null ? r.files : "-"} files`}
               badge={r.status === "Delivered" ? "Delivered" : null}
               onClick={() => setDress(r)}
             />

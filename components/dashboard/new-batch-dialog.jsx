@@ -6,10 +6,7 @@ import { Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /**
  * The batch name a date implies — "September 16 Release".
@@ -123,7 +120,7 @@ export function NewBatchDialog({ open, onClose, onCreate }) {
                 setName(e.target.value);
                 setNameEdited(true);
               }}
-              placeholder="September 16 Release"
+              placeholder="Sep 16 Release"
             />
           </label>
         </div>
