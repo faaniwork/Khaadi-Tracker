@@ -1,7 +1,31 @@
 import { NextResponse } from 'next/server';
-import { initResumableUpload, isWithinDress } from '@/lib/drive';
+import { initResumableUpload, isWithinDress, getFile, listFolder } from '@/lib/drive';
 import { getUserDriveAccessToken } from '@/lib/googleUserToken';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
+import { DRESS_VERSION_PATTERN, smartImageName } from '@/lib/constants';
+
+/**
+ * Works out which revision round `target` is, and the next picture number
+ * within it, so the upload gets a name that says what it is instead of
+ * whatever the camera or export tool called it.
+ *
+ * The dress folder itself IS the first round when nothing has ever been
+ * versioned out of it, so a folder whose name is not itself a bare "V2"/"V3"
+ * counts as V1. Position is one past however many images are already there,
+ * so re-uploading into a partly-filled round keeps numbering instead of
+ * restarting it.
+ */
+async function nameForUpload({ dressName, target, dressFolderId }) {
+  let version = 1;
+  if (target !== dressFolderId) {
+    const folder = await getFile(target);
+    const m = DRESS_VERSION_PATTERN.exec(String(folder?.name || '').trim());
+    if (m) version = Number(m[1]);
+  }
+  const existing = await listFolder(target);
+  const position = existing.filter((f) => !f.isFolder).length + 1;
+  return { version, position };
+}
 
 async function resolveTargetFolder(dressFolderId, folderId) {
   if (!folderId || typeof folderId !== 'string' || folderId === dressFolderId) {
@@ -39,6 +63,13 @@ export async function POST(req) {
     const dress = await assertDressInScope(caller, dressId);
     const target = await resolveTargetFolder(dress.id, folderId);
 
+    // Whatever the file was called on the way in, it lands in Drive named for
+    // what it actually is: which dress, which revision round, which picture
+    // in that round. See smartImageName in lib/constants.js.
+    const ext = String(name).includes('.') ? String(name).split('.').pop() : '';
+    const { version, position } = await nameForUpload({ dressName: dress.dress, target, dressFolderId: dress.id });
+    const smartName = smartImageName({ dressName: dress.dress, version, position, ext });
+
     // The browser's own follow-up PUT (see driveUpload in lib/api.js) will
     // carry this same Origin automatically since it's a cross-origin
     // request to Google's servers — the session has to be created with it
@@ -53,7 +84,7 @@ export async function POST(req) {
     const accessToken = await getUserDriveAccessToken();
     const uploadUrl = await initResumableUpload({
       folderId: target,
-      name,
+      name: smartName,
       mimeType,
       origin,
       accessToken,
