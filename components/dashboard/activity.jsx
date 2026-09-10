@@ -14,6 +14,7 @@ import {
   UserRound,
   Link2,
   Repeat2,
+  Plus,
 } from "lucide-react";
 import { timeAgo, fmt } from "@/lib/constants";
 import { fetchActivity } from "@/lib/api";
@@ -41,6 +42,8 @@ const KINDS = {
   trash: { label: "file removed", icon: Trash2, color: "var(--destructive)" },
   drive: { label: "Drive", icon: FolderSync, color: "var(--primary)" },
   link: { label: "review link", icon: Link2, color: "var(--primary)" },
+  "batch created": { label: "batch created", icon: Plus, color: "var(--good)" },
+  "batch removed": { label: "batch removed", icon: Trash2, color: "var(--destructive)" },
   default: { label: "change", icon: ActivityIcon, color: "var(--muted-foreground)" },
 };
 
@@ -62,6 +65,8 @@ const VERBS = {
   rename: "renamed",
   role: "changed access",
   picture: "updated their picture",
+  "batch created": "created batch",
+  "batch removed": "removed batch",
 };
 
 /**
@@ -133,6 +138,9 @@ function navTargetFor(entry, rows) {
   if (scope.startsWith("note:")) return releaseTarget(scope.slice(5));
   if (scope.startsWith("collection:")) return releaseTarget(scope.slice(11));
   if (scope.startsWith("review-link:")) return releaseTarget(scope.slice(12));
+  // A batch itself - created, removed, or its revisions count changed.
+  // Distinct from "cost:release:" above (a different, longer prefix).
+  if (scope.startsWith("release:")) return releaseTarget(scope.slice(8));
   if (scope.startsWith("access:")) return { kind: "page", page: "access" };
   return null;
 }
@@ -160,6 +168,7 @@ function releaseFor(entry, rows) {
   if (scope.startsWith("note:")) return scope.slice(5);
   if (scope.startsWith("collection:")) return scope.slice(11);
   if (scope.startsWith("review-link:")) return scope.slice(12);
+  if (scope.startsWith("release:")) return scope.slice(8);
   return null;
 }
 
@@ -175,6 +184,10 @@ function targetOf(entry) {
   if (scope.startsWith("access:")) return scope.replace("access:", "");
   if (scope.startsWith("review-link:")) return scope.replace("review-link:", "");
   if (scope.startsWith("profile:")) return "";
+  // Was falling through to the raw scope ("release:Sep 24 Release" showing
+  // up verbatim, colon and all) for batch created/removed and per-release
+  // revisions edits - the one prefix the checks above didn't cover.
+  if (scope.startsWith("release:")) return scope.replace("release:", "");
   return scope;
 }
 
