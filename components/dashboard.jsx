@@ -614,7 +614,10 @@ export function Dashboard({ user }) {
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
     else if (target === "activity" || target === "access" || target === "outputs") setView({ page: target, batch: null });
-    else setView({ page: "batch", batch: target });
+    // A batch name: browsing one goes to the images, which is what anyone
+    // opening a batch actually came for. The editing side of a batch is a
+    // step further in, via "Batch tools".
+    else setView({ page: "outputs", batch: target });
     setSearch("");
     setStatusFilter("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -701,7 +704,9 @@ export function Dashboard({ user }) {
   }
 
   const searching = search.trim() || statusFilter;
-  const activeNavId = view.page === "batch" ? view.batch : view.page;
+  // A batch stays lit in the sidebar whether you are browsing its images or
+  // in its tools.
+  const activeNavId = view.batch || view.page;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -711,7 +716,8 @@ export function Dashboard({ user }) {
         <Header
           view={view}
           onNav={onNav}
-          onBack={() => onNav("overview")}
+          // Inside a batch, back means all batches; elsewhere, the overview.
+          onBack={() => onNav(view.batch ? "outputs" : "overview")}
           live={live}
           role={role}
           syncSummary={syncSummary}
@@ -798,7 +804,18 @@ export function Dashboard({ user }) {
           ) : view.page === "access" ? (
             <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
           ) : view.page === "outputs" ? (
-            <OutputView rows={rows} showToast={showToast} canWrite={canEdit} />
+            <OutputView
+              // Keyed by the batch so arriving at a different one starts at
+              // that batch instead of wherever the last visit left off.
+              key={view.batch || "all"}
+              rows={rows}
+              showToast={showToast}
+              canWrite={canEdit}
+              initialRelease={view.batch}
+              onOpenBatchTools={
+                canEdit ? (rel) => setView({ page: "batch", batch: rel }) : undefined
+              }
+            />
           ) : (
             <BatchPage
               // Remounted per batch on purpose. BatchPage keeps the open

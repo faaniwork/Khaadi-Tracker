@@ -25,6 +25,24 @@ export function Crumb({ view, onBack }) {
       </div>
     );
   }
+  // Browsing inside a batch: name the batch, not the section. "Khaadi PDPs"
+  // is true but useless once you are three levels into one.
+  if (view.page === "outputs" && view.batch) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold mb-1 text-primary"
+        >
+          <ArrowLeft className="size-4" /> All batches
+        </button>
+        <h1 className="f-heading text-xl sm:text-2xl font-semibold tracking-[-0.01em] leading-tight text-foreground">
+          {view.batch}
+        </h1>
+      </div>
+    );
+  }
   if (PAGE_TITLES[view.page]) {
     const [title, sub] = PAGE_TITLES[view.page];
     // Outputs is a sibling mode, not a page nested under the dashboard — the

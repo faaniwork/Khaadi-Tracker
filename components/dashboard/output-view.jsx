@@ -107,8 +107,21 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide }) {
  * batch that matters most weeks, and making them pick it out of a list every
  * time was exactly the extra click this view exists to remove.
  */
-export function OutputView({ rows, showToast, canWrite = false, autoLatest = false }) {
-  const [release, setRelease] = useState(() => (autoLatest ? sortedReleases(rows)[0] || null : null));
+export function OutputView({
+  rows,
+  showToast,
+  canWrite = false,
+  autoLatest = false,
+  initialRelease = null,
+  onOpenBatchTools,
+}) {
+  // `initialRelease` is how the sidebar and a batch card's "View collections"
+  // land you straight inside a batch. The caller keys this component by that
+  // release, so arriving at a different one remounts with it rather than
+  // needing this state to be lifted and controlled from outside.
+  const [release, setRelease] = useState(
+    () => initialRelease || (autoLatest ? sortedReleases(rows)[0] || null : null)
+  );
   const [collection, setCollection] = useState(null);
   const [dress, setDress] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
@@ -191,6 +204,18 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
         ) : null}
         {!dress && release ? (
           <DownloadMenu dresses={collection ? collectionRows : releaseRows} showToast={showToast} className="ml-auto" />
+        ) : null}
+        {release && onOpenBatchTools ? (
+          <button
+            type="button"
+            onClick={() => onOpenBatchTools(release)}
+            title="Notes, credit cost, statuses and Drive resync for this batch"
+            className={`text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors ${
+              !dress ? "" : "ml-auto"
+            }`}
+          >
+            Batch tools
+          </button>
         ) : null}
         {!dress ? (
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={release ? "text-xs" : "ml-auto text-xs"}>
