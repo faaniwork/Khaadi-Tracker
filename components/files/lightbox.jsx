@@ -47,14 +47,26 @@ function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom }) {
     if (!el) return;
     const onWheel = (e) => {
       e.preventDefault();
-      // A mouse wheel reports deltaY in ~100 steps; a trackpad reports many
-      // small ones, and a pinch arrives as a wheel event with ctrlKey set.
-      // Pinch gets a coarser factor because its deltas are tiny.
-      onZoomBy(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025));
+      // A Mac trackpad's pinch gesture arrives as a wheel event with ctrlKey
+      // set (its deltas are tiny, so it gets a coarser factor) - that always
+      // means zoom. A plain two-finger scroll (no ctrlKey) used to be read as
+      // zoom too, which is why swiping to move around a zoomed image just
+      // zoomed further instead of panning. Once zoomed, a plain scroll pans
+      // instead; only a flat image still reads it as zoom, same as a mouse
+      // wheel with no pinch gesture available at all.
+      if (e.ctrlKey) {
+        onZoomBy(-e.deltaY * 0.01);
+        return;
+      }
+      if (scale > 1) {
+        setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+        return;
+      }
+      onZoomBy(-e.deltaY * 0.0025);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [onZoomBy]);
+  }, [onZoomBy, scale]);
 
   const onPointerDown = (e) => {
     if (!zoomed) return;
