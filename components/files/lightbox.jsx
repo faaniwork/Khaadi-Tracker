@@ -47,26 +47,65 @@ function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom }) {
     if (!el) return;
     const onWheel = (e) => {
       e.preventDefault();
-      // A Mac trackpad's pinch gesture arrives as a wheel event with ctrlKey
-      // set (its deltas are tiny, so it gets a coarser factor) - that always
-      // means zoom. A plain two-finger scroll (no ctrlKey) used to be read as
-      // zoom too, which is why swiping to move around a zoomed image just
-      // zoomed further instead of panning. Once zoomed, a plain scroll pans
-      // instead; only a flat image still reads it as zoom, same as a mouse
-      // wheel with no pinch gesture available at all.
+      // A Mac trackpad's pinch (fingers spreading/closing) arrives as a
+      // wheel event with ctrlKey set - that, and only that, means zoom. A
+      // plain two-finger swipe (fingers moving together, no ctrlKey) is
+      // never zoom, at any zoom level: it used to fall through to zooming
+      // whenever the image was still flat, which is exactly backwards from
+      // how a trackpad separates the two gestures — pinch changes the
+      // distance between your fingers, a swipe does not, and the two
+      // shouldn't do the same thing just because the image happens to be at
+      // 1x. Panning while flat is a harmless no-op (the offset is ignored
+      // until zoomed), so nothing is lost for a plain mouse wheel either -
+      // the toolbar's own zoom button and a click still zoom without a
+      // pinch-capable device.
       if (e.ctrlKey) {
-        onZoomBy(-e.deltaY * 0.01);
+        onZoomBy(-e.deltaY * 0.02);
         return;
       }
-      if (scale > 1) {
-        setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
-        return;
-      }
-      onZoomBy(-e.deltaY * 0.0025);
+      setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [onZoomBy, scale]);
+  }, [onZoomBy]);
+
+  // Safari's trackpad pinch never fires the ctrlKey+wheel event the handler
+  // above relies on - it only ever fires this non-standard gesture* trio
+  // (gesturestart/gesturechange/gestureend, WebKit-only), which is why pinch
+  // did nothing at all in Safari even once wheel-based zoom worked in
+  // Chrome. `scale` on the event is a ratio against gesture START, not the
+  // previous event, so the delta fed to onZoomBy is against the last
+  // reading, not 1 - otherwise every frame after the first would jump by
+  // the gesture's total change instead of just what happened since the last
+  // one. Chrome and Firefox never dispatch these events at all, so this is
+  // purely additive.
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    let lastGestureScale = 1;
+    const onGestureStart = (e) => {
+      e.preventDefault();
+      lastGestureScale = e.scale;
+    };
+    const onGestureChange = (e) => {
+      e.preventDefault();
+      // A raw 1:1 mapping barely moved the needle - a full, comfortable
+      // pinch only changes e.scale by a few tenths, against a 1x-4x zoom
+      // range, so the delta gets amplified to make a normal pinch actually
+      // cover that range instead of needing several repeated pinches.
+      onZoomBy((e.scale - lastGestureScale) * 3);
+      lastGestureScale = e.scale;
+    };
+    const onGestureEnd = (e) => e.preventDefault();
+    el.addEventListener("gesturestart", onGestureStart);
+    el.addEventListener("gesturechange", onGestureChange);
+    el.addEventListener("gestureend", onGestureEnd);
+    return () => {
+      el.removeEventListener("gesturestart", onGestureStart);
+      el.removeEventListener("gesturechange", onGestureChange);
+      el.removeEventListener("gestureend", onGestureEnd);
+    };
+  }, [onZoomBy]);
 
   const onPointerDown = (e) => {
     if (!zoomed) return;

@@ -149,7 +149,7 @@ export async function POST(req) {
   } catch (e) {
     const status = e?.status || (e?.code === 'VIEW_ONLY' ? 403 : 500);
     if (status >= 500) console.error('batch create failed', e);
-    return NextResponse.json({ error: e.message || 'Could not create that batch' }, { status });
+    return NextResponse.json({ error: e.message || 'Could not create that batch', code: e.code }, { status });
   }
 }
 

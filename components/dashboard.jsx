@@ -747,8 +747,11 @@ export function Dashboard({ user }) {
     return releases.filter((rel) => rowsFor(rows, rel).some((r) => r.status === statusFilter));
   }, [releases, rows, statusFilter]);
   const navItems = useMemo(() => {
+    // No "All" entry - overview is reachable from the desktop header's own
+    // Dashboard tab and the phone's Overview tab, and duplicating that here
+    // as a sidebar ring added a click that did nothing else the sidebar's
+    // batch rings don't already do.
     const items = [
-      { id: "overview", label: "All" },
       ...releases.map((r) => {
         const s = batchStats(rows, r);
         return { id: r, label: r, pct: s.pct, discarded: s.allDiscarded };

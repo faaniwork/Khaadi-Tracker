@@ -33,8 +33,10 @@ import { Logo } from "@/components/ui/logo";
  * to do: one added a shape that read as a glitch, the other made the
  * information harder to read to make one item stand out.
  */
-function NavRing({ id, pct, icon: Icon, discarded, selected }) {
-  const isIconItem = id === "overview" || Icon;
+function NavRing({ pct, icon: Icon, discarded, selected }) {
+  // The sidebar no longer carries an "All" entry (see navItems in
+  // dashboard.jsx), so an icon item is only ever Activity/Access now.
+  const isIconItem = Boolean(Icon);
 
   if (selected) {
     const fill = discarded ? "var(--destructive)" : "var(--foreground)";

@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { signOut } from "next-auth/react";
 import { Search, Sun, Moon, ArrowLeft, LogOut } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const PAGE_TITLES = {
   activity: ["Activity", "Who changed what, tracked in real time"],
@@ -135,6 +137,7 @@ export function Header({
 }) {
   const viewOnly = role !== "admin" && role !== "editor";
   const mode = view.page === "outputs" ? "outputs" : "dashboard";
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   return (
     <header className="shrink-0 border-b border-border bg-background">
       {/* flex-wrap rather than a fixed height: fitting live badge, search,
@@ -220,7 +223,7 @@ export function Header({
             </span>
             <button
               type="button"
-              onClick={() => signOut()}
+              onClick={() => setConfirmingSignOut(true)}
               title="Sign out"
               aria-label="Sign out"
               className="size-7 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
@@ -230,6 +233,14 @@ export function Header({
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmingSignOut}
+        title="Sign out?"
+        description="You'll need to sign in again with Google to get back to the board."
+        confirmLabel="Sign out"
+        onConfirm={() => signOut()}
+        onCancel={() => setConfirmingSignOut(false)}
+      />
       <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pb-4 sm:pb-5">
         <Crumb view={view} onBack={onBack} />
       </div>

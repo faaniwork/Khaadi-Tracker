@@ -94,6 +94,9 @@ export async function POST(req) {
   } catch (e) {
     const status = statusForError(e);
     if (status >= 500) console.error('drive upload-session failed', e);
-    return NextResponse.json({ error: e.message || 'Could not start the upload' }, { status });
+    // `code` lets the browser recognise DRIVE_ACCESS_REQUIRED specifically
+    // (an expired or missing Drive sign-in) and offer to sign the person out
+    // and back in, rather than showing this as just another failed upload.
+    return NextResponse.json({ error: e.message || 'Could not start the upload', code: e.code }, { status });
   }
 }

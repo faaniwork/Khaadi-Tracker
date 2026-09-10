@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
 import { ArrowLeft, FolderPlus, RefreshCw, Loader2, Folder, Trash2, Undo2, Layers, Plus } from "lucide-react";
 import {
   driveList,
@@ -64,6 +65,12 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const [addingVersion, setAddingVersion] = useState(false);
   const [bin, setBin] = useState(null); // null = closed, [] = open and empty
   const [binBusy, setBinBusy] = useState("");
+  // Set when Drive refuses to renew this person's own sign-in (see
+  // DRIVE_ACCESS_REQUIRED in lib/googleUserToken.js) - a toast that vanishes
+  // in a couple of seconds is the wrong shape for "you need to take an
+  // action before anything else here will work", so this gets its own
+  // dialog with the fix one tap away instead.
+  const [driveAccessIssue, setDriveAccessIssue] = useState("");
 
   const currentFolder = version ? version.id : trail.length ? trail[trail.length - 1].id : dress.id;
   const atRoot = !version && trail.length === 0;
@@ -137,6 +144,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     let done = 0;
     let failed = 0;
     let lastError = "";
+    let accessIssue = false;
     for (const file of files) {
       try {
         await driveUpload({
@@ -148,6 +156,17 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       } catch (e) {
         failed += 1;
         lastError = e.message || `Could not upload ${file.name}`;
+        // A DRIVE_ACCESS_REQUIRED here means Drive would not renew this
+        // person's sign-in (commonly the 7-day refresh-token limit on an
+        // app still in Google's "Testing" publishing state) - every
+        // remaining file in this batch is doomed the same way, so stop
+        // burning through them and surface the actual fix once instead of
+        // stacking up N identical failures.
+        if (e.code === "DRIVE_ACCESS_REQUIRED") {
+          accessIssue = true;
+          setDriveAccessIssue(e.message);
+          break;
+        }
       }
       done += 1;
       setUpload({ active: true, progress: done / files.length });
@@ -159,7 +178,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     // upload failure looked identical to success from here.
     const ok = files.length - failed;
     if (!ok) {
-      showToast?.(lastError || "Upload failed", "error");
+      if (!accessIssue) showToast?.(lastError || "Upload failed", "error");
     } else if (failed) {
       showToast?.(`Uploaded ${ok} of ${files.length} - ${failed} failed: ${lastError}`, "error");
     } else {
@@ -633,6 +652,14 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         confirmLabel="Remove"
         onConfirm={doTrash}
         onCancel={() => setConfirmTrash(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(driveAccessIssue)}
+        title="Your Drive sign-in expired"
+        description={driveAccessIssue}
+        confirmLabel="Sign out now"
+        onConfirm={() => signOut()}
+        onCancel={() => setDriveAccessIssue("")}
       />
       {lightboxIndex != null ? (
         <Lightbox
