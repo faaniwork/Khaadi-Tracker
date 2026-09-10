@@ -1093,6 +1093,16 @@ export function Dashboard({ user }) {
               showToast={showToast}
             />
           )}
+          {/* pb-28 above should already clear the fixed mobile tab bar, but
+              a flex container that is also the scrolling element does not
+              reliably keep its own bottom padding once scrolled to the end
+              (a well-known flexbox quirk - Chrome and Safari both drop it)
+              - the last card's note field and Add button ended up sitting
+              half behind the bar regardless of how much padding-bottom this
+              main carried. An explicit spacer as the actual last child
+              isn't subject to that quirk, so this is what really reserves
+              the room rather than the padding utility alone. */}
+          <div aria-hidden="true" className="shrink-0 h-28 md:hidden" />
         </main>
       </div>
 
