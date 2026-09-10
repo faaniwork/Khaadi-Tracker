@@ -204,6 +204,7 @@ export function OutputView({ rows, showToast, canWrite = false, autoLatest = fal
 
       {dress ? (
         <DressFiles
+          key={dress.id}
           dress={dress}
           canWrite={canWrite}
           canReview={true}

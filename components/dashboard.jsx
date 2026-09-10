@@ -798,6 +798,12 @@ export function Dashboard({ user }) {
             <OutputView rows={rows} showToast={showToast} canWrite={canEdit} />
           ) : (
             <BatchPage
+              // Remounted per batch on purpose. BatchPage keeps the open
+              // dress viewer in its own state, and React reuses a component
+              // in the same position across prop changes — so navigating from
+              // one batch to another left the previous batch's dress open and
+              // showing, which read as the page simply not changing.
+              key={view.batch}
               rel={view.batch}
               driveLink={driveLinkFor(view.batch, releaseFolders)}
               rows={rowsFor(rows, view.batch)}

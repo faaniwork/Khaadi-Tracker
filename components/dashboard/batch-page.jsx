@@ -154,6 +154,10 @@ export function BatchPage({
 
       {openFiles ? (
         <DressFiles
+          // Same reason as BatchPage's key: DressFiles keeps the opened
+          // subfolder trail in state, and carrying that to a different dress
+          // would list a folder belonging to the previous one.
+          key={openFiles.id}
           dress={openFiles}
           canWrite={canEdit}
           showToast={showToast}
