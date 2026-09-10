@@ -515,7 +515,7 @@ export function ChatWidget({ user, profiles }) {
                     const mine = m.email === user?.email;
                     const profile = profileFor(m.email);
                     const displayName = mine ? "You" : profile?.name || m.name || m.email;
-                    const canDelete = mine || isAdmin;
+                    const canDelete = mine; // your own message, full stop - not even an admin can reach into someone else's
                     return (
                       <ChatMessageRow
                         key={m.id}
