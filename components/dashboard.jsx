@@ -941,7 +941,22 @@ export function Dashboard({ user }) {
           // over the last inch of the page - pb-16 alone left its last card
           // or button sitting half behind the bar on a phone with a home
           // indicator eating into that space further still.
-          className={`flex-1 min-h-0 flex flex-col w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pt-4 sm:pt-7 ${
+          //
+          // flex/flex-col is lg:-only, not unconditional: it exists only for
+          // the pinned-summary desktop layout described below, where a
+          // child needs flex-1 to consume the remaining height. Below lg
+          // this used to make EVERY child of main a flex item regardless -
+          // and per spec, a flex item whose own overflow is anything but
+          // visible gets an automatic minimum size of 0 rather than its
+          // content size, making it eligible to be shrunk toward zero by
+          // the flex algorithm the moment main's total content ran taller
+          // than its own box (which it always does - that is the whole
+          // point of it scrolling). That is exactly what was silently
+          // collapsing the stats grid (and, in an earlier fix, the
+          // batches box) to a couple of pixels tall on a phone: both carry
+          // overflow-hidden for their own rounded corners, and neither
+          // needed to be a flex item at all outside of the lg: layout.
+          className={`flex-1 min-h-0 lg:flex lg:flex-col w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pt-4 sm:pt-7 ${
             !searching && view.page === "overview"
               ? "overflow-y-auto lg:overflow-hidden pb-28 md:pb-16 lg:pb-0"
               : "overflow-y-auto scrollbar-thin pb-28 md:pb-16"

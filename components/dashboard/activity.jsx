@@ -11,7 +11,6 @@ import {
   Image as ImageIcon,
   FolderSync,
   Trash2,
-  UserRound,
   Link2,
   Repeat2,
   Plus,
@@ -36,7 +35,6 @@ const KINDS = {
   note: { label: "note", icon: MessageSquare, color: "var(--info)" },
   rename: { label: "rename", icon: Tag, color: "var(--primary)" },
   role: { label: "access", icon: ShieldCheck, color: "var(--destructive)" },
-  picture: { label: "picture", icon: UserRound, color: "var(--primary)" },
   review: { label: "review", icon: ImageIcon, color: "var(--good)" },
   file: { label: "file", icon: ImageIcon, color: "var(--good)" },
   trash: { label: "file removed", icon: Trash2, color: "var(--destructive)" },
@@ -64,7 +62,6 @@ const VERBS = {
   note: "added a note",
   rename: "renamed",
   role: "changed access",
-  picture: "updated their picture",
   "batch created": "created batch",
   "batch removed": "removed batch",
 };
@@ -90,7 +87,6 @@ function classify(entry) {
   const field = entry.field || "";
 
   if (scope.startsWith("review-link:")) return KINDS.link;
-  if (scope.startsWith("profile:")) return KINDS.picture;
   if (scope.startsWith("access:")) return KINDS.role;
   if (scope.startsWith("file:")) {
     if (/trash/i.test(String(entry.newValue))) return KINDS.trash;
@@ -241,7 +237,6 @@ export function ActivityPage({ profiles, rows, onJump }) {
   const [refreshing, setRefreshing] = useState(false);
   const [kindFilter, setKindFilter] = useState("");
   const [batchFilter, setBatchFilter] = useState("");
-  const [personFilter, setPersonFilter] = useState("");
 
   // Runs once on mount. State is only ever set inside the promise's
   // then/catch (never synchronously in the effect body), so there is no
@@ -283,7 +278,6 @@ export function ActivityPage({ profiles, rows, onJump }) {
     const filtered = entries.filter((e) => {
       if (kindFilter && classify(e).label !== kindFilter) return false;
       if (batchFilter && (releaseFor(e, rows) || "No batch") !== batchFilter) return false;
-      if (personFilter && e.by !== personFilter) return false;
       return true;
     });
     const out = [];
@@ -297,26 +291,25 @@ export function ActivityPage({ profiles, rows, onJump }) {
       out[out.length - 1].items.push(e);
     });
     return out;
-  }, [entries, rows, kindFilter, batchFilter, personFilter]);
+  }, [entries, rows, kindFilter, batchFilter]);
 
   const availableKinds = useMemo(() => {
     if (!entries) return [];
     return [...new Set(entries.map((e) => classify(e).label))].sort();
   }, [entries]);
 
-  // "No batch" trails at the end rather than sorting alphabetically into the
-  // middle of the list - it is the catch-all, not a batch in its own right.
+  // Only batches that actually still exist - a removed batch's own history
+  // ("removed batch X") still shows up in the unfiltered feed, but offering
+  // it as something to filter TO is offering a dead end that looks broken.
   const availableBatches = useMemo(() => {
     if (!entries) return [];
-    const set = new Set(entries.map((e) => releaseFor(e, rows) || "No batch"));
+    const live = new Set((rows || []).map((r) => r.release || "Unsorted"));
+    const set = new Set(
+      entries.map((e) => releaseFor(e, rows) || "No batch").filter((b) => b === "No batch" || live.has(b))
+    );
     const named = [...set].filter((b) => b !== "No batch").sort();
     return set.has("No batch") ? [...named, "No batch"] : named;
   }, [entries, rows]);
-
-  const availablePeople = useMemo(() => {
-    if (!entries) return [];
-    return [...new Set(entries.map((e) => e.by))].sort();
-  }, [entries]);
 
   const lookup = (name) => profiles?.byName?.[name];
 
@@ -337,20 +330,6 @@ export function ActivityPage({ profiles, rows, onJump }) {
               {availableBatches.map((b) => (
                 <option key={b} value={b}>
                   {b}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          {availablePeople.length > 1 ? (
-            <select
-              value={personFilter}
-              onChange={(e) => setPersonFilter(e.target.value)}
-              className="rounded-[10px] border border-border bg-secondary/60 px-2 py-1.5 text-xs font-semibold text-foreground cursor-pointer outline-none focus-visible:border-primary"
-            >
-              <option value="">Everyone</option>
-              {availablePeople.map((p) => (
-                <option key={p} value={p}>
-                  {p}
                 </option>
               ))}
             </select>
@@ -390,9 +369,7 @@ export function ActivityPage({ profiles, rows, onJump }) {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : !grouped.length ? (
         <p className="text-sm text-muted-foreground">
-          {kindFilter || batchFilter || personFilter
-            ? "Nothing matches that filter."
-            : "No activity recorded yet."}
+          {kindFilter || batchFilter ? "Nothing matches that filter." : "No activity recorded yet."}
         </p>
       ) : (
         grouped.map((group) => (
