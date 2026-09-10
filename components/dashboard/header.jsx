@@ -134,9 +134,16 @@ export function Header({
   const mode = view.page === "outputs" ? "outputs" : "dashboard";
   return (
     <header className="shrink-0 border-b border-border bg-background">
-      <div className="w-full max-w-[1440px] mx-auto px-7 xl:px-10 flex items-center gap-3 h-14">
+      {/* flex-wrap rather than a fixed height: fitting live badge, search,
+          theme toggle and the account chip beside the mode tabs on a 375px
+          phone in one line is not possible, and forcing it used to push the
+          whole row past the edge of the screen (with html,body's overflow-x
+          guard clipping it entirely) rather than dropping to a second line,
+          so the theme toggle and sign-out button were simply unreachable on
+          a phone. */}
+        <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 flex flex-wrap items-center gap-2 sm:gap-3 py-2.5 sm:h-14 sm:py-0">
         <ModeTabs mode={mode} onNav={onNav} />
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
           {/* A bare green dot next to a search box was a pixel nobody could
               interpret. It says what it means now, and only takes space
               worth taking when something is actually wrong. */}
@@ -178,7 +185,7 @@ export function Header({
               value={search}
               onChange={(e) => onSearch(e.target.value)}
               placeholder="Search dress, collection, batch"
-              className="pl-9 pr-3 py-1.5 rounded-full w-[190px] focus:w-[260px] transition-[width] duration-300 ease-out"
+              className="pl-9 pr-3 py-1.5 rounded-full w-[130px] focus:w-[190px] sm:w-[190px] sm:focus:w-[260px] transition-[width] duration-300 ease-out"
             />
           </div>
 
@@ -220,7 +227,7 @@ export function Header({
           </div>
         </div>
       </div>
-      <div className="w-full max-w-[1440px] mx-auto px-7 xl:px-10 pb-5">
+      <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pb-4 sm:pb-5">
         <Crumb view={view} onBack={onBack} />
       </div>
     </header>

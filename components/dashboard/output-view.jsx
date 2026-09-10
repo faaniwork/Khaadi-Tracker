@@ -171,70 +171,86 @@ export function OutputView({
     </button>
   );
 
+  // The trail and the actions beside it (download, batch tools, the status
+  // filter) used to be one row with each control deciding for itself whether
+  // it earned the ml-auto that pushed it to the right - three different
+  // rules depending on whether a dress/collection/release was open. On a
+  // phone that produced whichever mix of them happened to fit on the trail's
+  // own line and dropped the rest wherever they landed, which is the
+  // "Download" that showed up half off-screen. Splitting the actions into
+  // their own group removes the guesswork: the trail wraps on its own line,
+  // the actions wrap as a tidy row underneath, and only from sm up does
+  // ml-auto pull that whole group back onto the trail's line.
+  const actions = (
+    <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
+      {!dress && release ? (
+        <DownloadMenu dresses={collection ? collectionRows : releaseRows} showToast={showToast} />
+      ) : null}
+      {release && onOpenBatchTools ? (
+        <button
+          type="button"
+          onClick={() => onOpenBatchTools(release)}
+          title="Notes, credit cost, statuses and Drive resync for this batch"
+          className="text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Batch tools
+        </button>
+      ) : null}
+      {!dress ? (
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-xs">
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+    </div>
+  );
+
   return (
     <div>
-      <div className="flex items-center gap-1.5 flex-wrap mb-5 text-sm">
-        {release ? (
-          crumb("All batches", () => {
-            setRelease(null);
-            setCollection(null);
-            setDress(null);
-          })
-        ) : null}
-        {release ? (
-          <>
-            <ChevronRight className="size-3.5 text-muted-foreground" />
-            {collection || dress ? (
-              crumb(release, () => {
-                setCollection(null);
-                setDress(null);
-              })
-            ) : (
-              <span className="text-sm font-bold text-foreground">{release}</span>
-            )}
-          </>
-        ) : null}
-        {collection ? (
-          <>
-            <ChevronRight className="size-3.5 text-muted-foreground" />
-            {dress ? (
-              crumb(collection, () => setDress(null))
-            ) : (
-              <span className="text-sm font-bold text-foreground">{collection}</span>
-            )}
-          </>
-        ) : null}
-        {dress ? (
-          <>
-            <ChevronRight className="size-3.5 text-muted-foreground" />
-            <span className="text-sm font-bold text-foreground">{dress.dress}</span>
-          </>
-        ) : null}
-        {!dress && release ? (
-          <DownloadMenu dresses={collection ? collectionRows : releaseRows} showToast={showToast} className="ml-auto" />
-        ) : null}
-        {release && onOpenBatchTools ? (
-          <button
-            type="button"
-            onClick={() => onOpenBatchTools(release)}
-            title="Notes, credit cost, statuses and Drive resync for this batch"
-            className={`text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors ${
-              !dress ? "" : "ml-auto"
-            }`}
-          >
-            Batch tools
-          </button>
-        ) : null}
-        {!dress ? (
-          <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={release ? "text-xs" : "ml-auto text-xs"}>
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </Select>
-        ) : null}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-5 text-sm">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {release ? (
+            crumb("All batches", () => {
+              setRelease(null);
+              setCollection(null);
+              setDress(null);
+            })
+          ) : null}
+          {release ? (
+            <>
+              <ChevronRight className="size-3.5 text-muted-foreground" />
+              {collection || dress ? (
+                crumb(release, () => {
+                  setCollection(null);
+                  setDress(null);
+                })
+              ) : (
+                <span className="text-sm font-bold text-foreground">{release}</span>
+              )}
+            </>
+          ) : null}
+          {collection ? (
+            <>
+              <ChevronRight className="size-3.5 text-muted-foreground" />
+              {dress ? (
+                crumb(collection, () => setDress(null))
+              ) : (
+                <span className="text-sm font-bold text-foreground">{collection}</span>
+              )}
+            </>
+          ) : null}
+          {dress ? (
+            <>
+              <ChevronRight className="size-3.5 text-muted-foreground" />
+              <span className="text-sm font-bold text-foreground">{dress.dress}</span>
+            </>
+          ) : null}
+        </div>
+        {actions}
       </div>
 
       {dress ? (

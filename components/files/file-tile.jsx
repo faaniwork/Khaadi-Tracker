@@ -216,7 +216,7 @@ export function FileTile({
           </p>
         ) : null}
 
-        <div className="mt-auto flex items-center gap-3">
+        <div className="mt-auto flex items-center flex-wrap gap-x-2 gap-y-1.5">
           {canReview ? (
             <>
               <button
@@ -225,7 +225,7 @@ export function FileTile({
                 onClick={() => onApprove?.(file)}
                 title={status === "approved" ? "Approved - click to clear" : "Approve"}
                 aria-label="Approve"
-                className="p-1 -m-1 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
+                className="p-1.5 -m-1 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
                 style={{ color: status === "approved" ? "var(--good)" : "var(--muted-foreground)" }}
               >
                 <Check className="size-[18px]" strokeWidth={status === "approved" ? 3 : 2} />
@@ -236,7 +236,7 @@ export function FileTile({
                 onClick={() => onReject?.(file)}
                 title={status === "rejected" ? "Rejected - click to change the reason" : "Reject"}
                 aria-label="Reject"
-                className="p-1 -m-1 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
+                className="p-1.5 -m-1 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
                 style={{ color: status === "rejected" ? "var(--destructive)" : "var(--muted-foreground)" }}
               >
                 <X className="size-[18px]" strokeWidth={status === "rejected" ? 3 : 2} />
@@ -248,7 +248,7 @@ export function FileTile({
             type="button"
             onClick={() => setShowComments((s) => !s)}
             aria-label="Comments"
-            className="flex items-center gap-1 p-1 -m-1 rounded-lg hover:bg-secondary transition-colors ml-auto"
+            className="flex items-center gap-1 p-1.5 -m-1 rounded-lg hover:bg-secondary transition-colors ml-auto"
             style={{ color: showComments ? "var(--primary)" : hasComments ? "var(--warn)" : "var(--muted-foreground)" }}
           >
             <MessageCircle className="size-4" strokeWidth={showComments || hasComments ? 2.5 : 2} />
@@ -264,7 +264,7 @@ export function FileTile({
               rel="noopener noreferrer"
               title="Open in Drive"
               aria-label="Open in Drive"
-              className="p-1 -m-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              className="p-1.5 -m-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             >
               <DriveIcon className="size-4" />
             </a>
@@ -277,7 +277,7 @@ export function FileTile({
               onClick={() => onTrash?.(file)}
               title="Move to Drive trash"
               aria-label="Move to Drive trash"
-              className="p-1 -m-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors disabled:opacity-50"
+              className="p-1.5 -m-1 rounded-lg text-muted-foreground hover:text-destructive hover:bg-secondary transition-colors disabled:opacity-50"
             >
               <Trash2 className="size-4" />
             </button>

@@ -816,7 +816,7 @@ export function Dashboard({ user }) {
             </button>
           </div>
         </header>
-        <main className="w-full max-w-[1440px] mx-auto px-7 xl:px-10 py-7">
+        <main className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 py-5 sm:py-7">
           <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
         </main>
         <Toast {...toast} />
@@ -830,9 +830,13 @@ export function Dashboard({ user }) {
   const activeNavId = view.batch || view.page;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-frame gap-2.5 p-2.5">
+    // No frame gap/padding on a phone: the inset panel look is a deliberate
+    // choice on a wide screen where there is width to spare, but on a phone
+    // the same inset just eats the few pixels the content actually needs -
+    // full width there, back to the framed panel from sm up.
+    <div className="flex h-screen overflow-hidden bg-frame gap-0 p-0 sm:gap-2.5 sm:p-2.5">
       <Sidebar items={navItems} active={{ id: activeNavId }} onNav={onNav} />
-      <div className="flex-1 min-w-0 flex flex-col min-h-0 rounded-[18px] border border-border bg-background overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0 rounded-none sm:rounded-[18px] border-0 sm:border border-border bg-background overflow-hidden">
         <MobileNav items={navItems} active={{ id: activeNavId }} onNav={onNav} />
         <Header
           view={view}
@@ -856,7 +860,7 @@ export function Dashboard({ user }) {
             charts. On a phone that would leave no room for the cards at all,
             so there the whole page scrolls as before. */}
         <main
-          className={`flex-1 min-h-0 flex flex-col w-full max-w-[1440px] mx-auto px-7 xl:px-10 pt-7 ${
+          className={`flex-1 min-h-0 flex flex-col w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pt-4 sm:pt-7 ${
             !searching && view.page === "overview"
               ? "overflow-y-auto lg:overflow-hidden pb-16 lg:pb-0"
               : "overflow-y-auto scrollbar-thin pb-16"

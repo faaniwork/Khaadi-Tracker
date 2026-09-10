@@ -359,26 +359,36 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   });
 
   return (
-    <div className="rounded-[14px] border border-border bg-card p-5 mb-5 rise">
-      <div className="flex items-center gap-3 flex-wrap mb-4">
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          <ArrowLeft className="size-3.5" /> Back
-        </Button>
-        <div className="min-w-0">
-          <h3 className="f-heading font-bold text-base text-foreground truncate">
-            {dress.dress}
-            {version ? <span className="text-muted-foreground"> / {version.name}</span> : null}
-            {trail.length ? <span className="text-muted-foreground"> / {trail.map((t) => t.name).join(" / ")}</span> : null}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {dress.collection} · {state.files.filter((f) => !f.isFolder).length} file
-            {state.files.filter((f) => !f.isFolder).length === 1 ? "" : "s"}
-            {counts.approved ? ` · ${counts.approved} approved` : ""}
-            {commentedCount ? ` · ${commentedCount} commented` : ""}
-            {counts.rejected ? ` · ${counts.rejected} rejected` : ""}
-          </p>
+    <div className="rounded-[14px] border border-border bg-card p-3.5 sm:p-5 mb-5 rise">
+      {/* Title and the five actions beside it used to be one flex row that
+          only wrapped as a whole - on a phone the actions (download, filter,
+          up, bin, refresh) still had to share one un-wrapping line among
+          themselves once they landed on their own row, so the last one or
+          two ran off the edge and out of reach behind the page's overflow
+          guard. Splitting them into their own wrapping group fixes that: the
+          title sits on its own line, the actions wrap freely underneath, and
+          on sm+ they still sit beside the title exactly as before. */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <ArrowLeft className="size-3.5" /> Back
+          </Button>
+          <div className="min-w-0">
+            <h3 className="f-heading font-bold text-base text-foreground truncate">
+              {dress.dress}
+              {version ? <span className="text-muted-foreground"> / {version.name}</span> : null}
+              {trail.length ? <span className="text-muted-foreground"> / {trail.map((t) => t.name).join(" / ")}</span> : null}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              {dress.collection} · {state.files.filter((f) => !f.isFolder).length} file
+              {state.files.filter((f) => !f.isFolder).length === 1 ? "" : "s"}
+              {counts.approved ? ` · ${counts.approved} approved` : ""}
+              {commentedCount ? ` · ${commentedCount} commented` : ""}
+              {counts.rejected ? ` · ${counts.rejected} rejected` : ""}
+            </p>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
           <DownloadMenu dresses={[dress]} showToast={showToast} />
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-xs">
             {STATUS_FILTERS.map((f) => (
@@ -562,7 +572,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           {state.files.length ? "No files match that filter." : "Nothing in this folder yet."}
         </p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mt-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 mt-4">
           {visibleFiles.map((f) => (
             <FileTile
               key={f.id}

@@ -126,6 +126,13 @@
 }
 
 * { border-color: var(--border); }
+html, body {
+  /* A row that does not fit a phone's width used to widen the whole page
+     instead of wrapping or clipping, so the board scrolled sideways - this
+     is the backstop: nothing on this app is meant to be reached by swiping
+     right, so nothing gets to force that scrollbar into existing. */
+  overflow-x: hidden;
+}
 body {
   background: var(--background);
   color: var(--foreground);
