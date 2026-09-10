@@ -13,6 +13,19 @@ const ROLE_HINT = {
   client: "Outputs only - can browse batches and approve or reject images, nothing else.",
 };
 
+/**
+ * Says what happened to the person's Drive access as well as their role,
+ * because the Drive half is the part that decides whether they can actually
+ * upload, and it can fail on its own.
+ */
+function driveNote(result) {
+  if (result?.drive === "granted") return " and can now upload to Drive";
+  if (result?.drive === "revoked") return " and lost Drive access";
+  if (result?.drive === "refused") return ", but Drive would not let us change its sharing";
+  if (result?.drive === "failed") return `, but Drive access failed: ${result.driveError || "unknown"}`;
+  return "";
+}
+
 export function AccessPage({ role, currentEmail, showToast }) {
   const [list, setList] = useState(null);
   const [error, setError] = useState(null);
@@ -54,9 +67,9 @@ export function AccessPage({ role, currentEmail, showToast }) {
     setSavingRow(email);
     try {
       const current = list.find((r) => r.email === email);
-      await saveAccess({ email, role: newRole, notes: current?.notes || "" });
+      const res = await saveAccess({ email, role: newRole, notes: current?.notes || "" });
       setList((prev) => prev.map((r) => (r.email === email ? { ...r, role: newRole } : r)));
-      showToast?.(`${email} is now ${newRole}`);
+      showToast?.(`${email} is now ${newRole}${driveNote(res)}`);
     } catch (e) {
       showToast?.(e.message || "Failed to update role", "error");
     } finally {
@@ -68,9 +81,9 @@ export function AccessPage({ role, currentEmail, showToast }) {
     if (email === currentEmail) return;
     setSavingRow(email);
     try {
-      await deleteAccess({ email });
+      const res = await deleteAccess({ email });
       setList((prev) => prev.filter((r) => r.email !== email));
-      showToast?.(`Removed ${email}`);
+      showToast?.(`Removed ${email}${driveNote(res)}`);
     } catch (e) {
       showToast?.(e.message || "Failed to remove access", "error");
     } finally {
@@ -90,7 +103,7 @@ export function AccessPage({ role, currentEmail, showToast }) {
         return [...without, result].sort((a, b) => a.email.localeCompare(b.email));
       });
       setForm({ email: "", role: "viewer", notes: "" });
-      showToast?.(`Added ${result.email} as ${result.role}`);
+      showToast?.(`Added ${result.email} as ${result.role}${driveNote(result)}`);
     } catch (e2) {
       showToast?.(e2.message || "Failed to add access", "error");
     } finally {

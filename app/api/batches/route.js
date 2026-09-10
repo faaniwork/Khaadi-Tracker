@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { createFolder, getParentFolderId, mapWithConcurrency, trashFile } from '@/lib/drive';
+import { createFolder, mapWithConcurrency, trashFile } from '@/lib/drive';
 import { getUserDriveAccessToken } from '@/lib/googleUserToken';
+import { resolveOutputFolderId } from '@/lib/driveSync';
 import {
   assertReleaseNameFree,
   createReleaseRecord,
   deleteRelease,
   getMyRole,
   getReleaseFolderId,
-  getReleaseFolderMap,
 } from '@/lib/db';
-import { RELEASE_LINKS, driveFolderIdFromUrl, looksLikeDressFolder } from '@/lib/constants';
+import { looksLikeDressFolder } from '@/lib/constants';
 
 // Drive tolerates this comfortably and it keeps a batch of ~40 new folders
 // inside a serverless request's time budget.
@@ -21,38 +21,6 @@ const CONCURRENCY = 6;
 // would blow the request's time budget on the way to finding that out.
 const MAX_COLLECTIONS = 20;
 const MAX_DRESSES = 60;
-
-/**
- * The folder every batch folder lives inside — the shoot's "Output" folder.
- *
- * Deliberately discovered rather than configured: every existing batch folder
- * already sits directly inside it, so the parent of a batch we already know
- * about IS it, and there is no id for anyone to set, paste wrong, or leave
- * stale when the shoot moves. DRIVE_OUTPUT_FOLDER_ID overrides it for the
- * case where no batch exists yet to look up.
- */
-async function resolveOutputFolderId() {
-  const configured = process.env.DRIVE_OUTPUT_FOLDER_ID;
-  if (configured) return configured;
-
-  // Batches created through this app come first, since their folder ids came
-  // from Drive itself rather than from a link copied by hand.
-  const recorded = await getReleaseFolderMap();
-  const candidates = [
-    ...Object.values(recorded).map((r) => r.folderId),
-    ...Object.values(RELEASE_LINKS).map(driveFolderIdFromUrl),
-  ].filter(Boolean);
-
-  for (const known of candidates) {
-    const parent = await getParentFolderId(known);
-    if (parent) return parent;
-  }
-  const err = new Error(
-    'Could not work out which Drive folder new batches belong in. Set DRIVE_OUTPUT_FOLDER_ID to the shoot\'s Output folder id.'
-  );
-  err.status = 500;
-  throw err;
-}
 
 function bad(message, status = 400) {
   return NextResponse.json({ error: message }, { status });
