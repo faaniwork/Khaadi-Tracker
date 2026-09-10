@@ -15,15 +15,56 @@ import { Logo } from "@/components/ui/logo";
  *   0%         empty ring with NO number, since a bare "0" reads as noise
  *   anything   the usual progress ring with its percentage
  */
-function NavRing({ id, pct, icon: Icon, discarded, dim }) {
-  if (id === "overview" || Icon) {
+/**
+ * A batch's ring.
+ *
+ * Three states worth telling apart, because two of them used to look the
+ * same. A batch where everything was discarded and a batch where nothing has
+ * been delivered yet both drew an empty ring with "0" in it, which made a
+ * dead batch look like a batch that had not started.
+ *
+ *   discarded  solid red ring with a slash, and the label struck through
+ *   0%         empty ring with NO number, since a bare "0" reads as noise
+ *   anything   the usual progress ring with its percentage
+ *
+ * SELECTED is the ring FILLING IN, rather than anything drawn beside it or
+ * any weakening of its neighbours. Outline against solid is a difference you
+ * cannot miss and it happens on the item itself, which is what the bar on
+ * the sidebar's edge and the dimming of every other batch were both failing
+ * to do: one added a shape that read as a glitch, the other made the
+ * information harder to read to make one item stand out.
+ */
+function NavRing({ id, pct, icon: Icon, discarded, selected }) {
+  const isIconItem = id === "overview" || Icon;
+
+  if (selected) {
+    const fill = discarded ? "var(--destructive)" : "var(--foreground)";
+    const ink = discarded ? "var(--destructive-foreground)" : "var(--background)";
+    const DisplayIcon = Icon || LayoutGrid;
+    const rounded = Math.round(pct || 0);
+    return (
+      <div
+        className="grid place-items-center rounded-full shrink-0"
+        style={{ width: 44, height: 44, background: fill }}
+      >
+        {isIconItem ? (
+          <DisplayIcon className="size-4" style={{ color: ink }} />
+        ) : discarded ? (
+          <Ban className="size-4" style={{ color: ink }} />
+        ) : (
+          <span className="f-mono font-bold" style={{ fontSize: 11, color: ink }}>
+            {rounded ? String(rounded) : ""}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  if (isIconItem) {
     const DisplayIcon = Icon || LayoutGrid;
     return (
       <div className="ring-chart" style={{ width: 44, height: 44, background: "var(--secondary)" }}>
-        <DisplayIcon
-          className="size-4"
-          style={{ color: dim ? "var(--muted-foreground)" : "var(--foreground)" }}
-        />
+        <DisplayIcon className="size-4 text-foreground" />
       </div>
     );
   }
@@ -32,44 +73,15 @@ function NavRing({ id, pct, icon: Icon, discarded, dim }) {
       <Ring
         pct={100}
         size={44}
-        color={dim ? "color-mix(in oklch, var(--destructive) 45%, transparent)" : "var(--destructive)"}
-        label={
-          <Ban
-            className="size-4"
-            style={{
-              color: dim
-                ? "color-mix(in oklch, var(--destructive) 55%, transparent)"
-                : "var(--destructive)",
-            }}
-          />
-        }
+        color="var(--destructive)"
+        label={<Ban className="size-4" style={{ color: "var(--destructive)" }} />}
       />
     );
   }
   const rounded = Math.round(pct || 0);
-  return (
-    <Ring
-      pct={pct}
-      size={44}
-      color={dim ? "var(--muted-foreground)" : "var(--foreground)"}
-      label={rounded ? String(rounded) : ""}
-    />
-  );
+  return <Ring pct={pct} size={44} label={rounded ? String(rounded) : ""} />;
 }
 
-/**
- * Where you are, shown by CONTRAST rather than by decoration.
- *
- * The previous attempt drew a bar on the sidebar's edge and a filled pill
- * behind the active item, and it read as a glitch: a floating black stub
- * beside a grey block. The cause was that every ring was at full strength,
- * so the current one had to shout to be picked out at all.
- *
- * Now the others step back. Inactive rings and labels are muted, the active
- * one is at full strength, and nothing extra is drawn. It is the same trick
- * that makes the rest of this board readable: colour, or in this case
- * contrast, only where it means something.
- */
 function NavButton({ it, isActive, onNav }) {
   return (
     <button
@@ -77,19 +89,17 @@ function NavButton({ it, isActive, onNav }) {
       onClick={() => onNav(it.id)}
       aria-current={isActive ? "page" : undefined}
       title={it.discarded ? `${it.label} - all discarded` : it.label}
-      className={`flex flex-col items-center gap-1.5 py-2.5 w-full rounded-xl transition-opacity duration-200 ${
-        isActive ? "opacity-100" : "opacity-55 hover:opacity-100"
-      }`}
+      className="flex flex-col items-center gap-1.5 py-2.5 w-full rounded-xl transition-transform duration-200 hover:-translate-y-px"
     >
       <NavRing
         id={it.id}
         pct={it.pct}
         icon={it.icon}
         discarded={it.discarded}
-        dim={!isActive}
+        selected={isActive}
       />
       <span
-        className={`f-mono text-[9.5px] uppercase tracking-wide transition-colors ${
+        className={`f-mono text-[9.5px] uppercase tracking-wide ${
           isActive ? "font-bold text-foreground" : "font-semibold text-muted-foreground"
         } ${it.discarded ? "line-through" : ""}`}
       >
