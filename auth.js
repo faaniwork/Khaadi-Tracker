@@ -1,38 +1,31 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import Google from 'next-auth/providers/google';
 import { verifyLoginCode } from '@/lib/db';
 
-// Two ways in: email + a one-time code (see components/sign-in.jsx), or
-// Google - kept as a fallback specifically because the email path depends on
-// RESEND_API_KEY being configured, and until that's done nobody could sign
-// in at all otherwise. Google only ever identifies someone here now (no
-// Drive scope, no offline access) - uploading no longer runs "as whoever is
-// signed in" for anyone, Google or email alike, since it now always runs as
-// one shared, already-authorized Drive account (see lib/googleUserToken.js
-// and app/api/admin/drive-connect). That also means Google sign-in itself
-// never touches a "restricted" OAuth scope any more, though the project's
-// OAuth consent screen being in Testing status still caps it to whoever is
-// on the test-user list - the email+code path is what removes that cap
-// entirely once RESEND_API_KEY is set.
+// Email + a one-time code, the only way in. Google sign-in was tried as a
+// fallback, but it can never actually serve "anyone" the way this needs to -
+// the project's OAuth consent screen stays in Google's Testing status
+// (moving it to Production means a real, multi-week verification review,
+// since this app's Drive access is a restricted scope), so Google always
+// rejects anyone not on a hand-maintained test-user list with "you do not
+// have access", no matter what this app's own code does. Email+code has no
+// such ceiling: anyone can request one and sign in.
 //
-// What either path gets someone is still entirely gated by the access
-// table (see getMyRole in lib/db.js) - a brand new email lands as 'viewer'
-// until an admin promotes it, exactly as before.
+// This used to also check ALLOWED_EMAIL_DOMAINS, restricting sign-in to
+// specific email domains - inherited from when the only sign-in method was
+// Google. That is exactly backwards from what this path exists for: it
+// silently sent a real code to any email that asked, then rejected the code
+// at the sign-in step for every email outside the allowed domains, which is
+// why a code could "arrive" and still be reported as "wrong or expired." No
+// domain restriction here any more - anyone can sign in. What they can DO
+// once they're in is still entirely gated by the access table (see
+// getMyRole in lib/db.js): a brand new email lands as 'viewer' until an
+// admin promotes it.
 //
-// Optionally restrict who can sign in via ALLOWED_EMAIL_DOMAINS, e.g.
-// "imagine.art,vyro.ai" — leave unset to allow any email address (the real
-// gate is still the Access tab, which decides editor vs viewer).
-const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS || '')
-  .split(',')
-  .map((d) => d.trim().toLowerCase())
-  .filter(Boolean);
-
-function domainAllowed(email) {
-  if (!allowedDomains.length) return true;
-  return allowedDomains.some((d) => String(email || '').toLowerCase().endsWith('@' + d));
-}
-
+// Uploading to Drive does not depend on how someone signed in either way -
+// it always runs as one shared, already-authorized Drive account (see
+// lib/googleUserToken.js and app/api/admin/drive-connect), connected once
+// and unaffected by removing Google here.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
@@ -45,7 +38,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const email = String(credentials?.email || '').trim().toLowerCase();
         const code = String(credentials?.code || '').trim();
-        if (!email || !code || !domainAllowed(email)) return null;
+        if (!email || !code) return null;
         const ok = await verifyLoginCode(email, code);
         if (!ok) return null;
         // Auth.js wants an `id`; the email itself is the only identity this
@@ -53,17 +46,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { id: email, email, name: email.split('@')[0] };
       },
     }),
-    Google({
-      authorization: { params: { scope: 'openid email profile' } },
-    }),
   ],
-  session: { strategy: 'jwt' },
+  // 90 days rather than Auth.js's own 30-day default: signing in is now a
+  // real "check your email" step every time it happens, not a one-tap
+  // Google account picker, so a session that goes stale after a month reads
+  // as "I have to do this again" far more than it used to.
+  session: { strategy: 'jwt', maxAge: 90 * 24 * 60 * 60 },
   trustHost: true,
-  callbacks: {
-    async signIn({ account, profile }) {
-      if (account?.provider !== 'google') return true;
-      return domainAllowed(profile?.email);
-    },
-  },
   pages: {},
 });

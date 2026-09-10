@@ -236,7 +236,7 @@ export function Header({
       <ConfirmDialog
         open={confirmingSignOut}
         title="Sign out?"
-        description="You'll need to sign in again with Google to get back to the board."
+        description="You'll need a fresh email code to get back to the board."
         confirmLabel="Sign out"
         onConfirm={() => signOut()}
         onCancel={() => setConfirmingSignOut(false)}

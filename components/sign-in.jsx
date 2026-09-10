@@ -7,15 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/ui/logo";
 
 /**
- * Email, then the code that email just received - the main way in. Google
- * stays underneath as a fallback: the email path needs RESEND_API_KEY
- * configured to actually send anything, and until that's done Google is
- * what keeps sign-in working at all (capped to whoever is on this project's
- * Google test-user list, same restriction as before).
+ * Email, then the code that email just received - the only way in now.
+ * Google sign-in was tried as a fallback but never actually served "anyone"
+ * the way this needs to: the project's OAuth consent screen stays in
+ * Google's Testing status (moving it to Production means a real, multi-week
+ * verification review), so Google rejected anyone not on a hand-maintained
+ * test-user list outright, regardless of anything this app's own code did.
  *
  * A brand new email works exactly like a returning one: it gets a code and
- * signs in as 'viewer' the first time, same as before. Nothing here decides
- * who can do what - that's still the Access page, same as always.
+ * signs in as 'viewer' the first time. Nothing here decides who can do what
+ * - that's still the Access page, same as always.
  */
 export function SignIn() {
   const [step, setStep] = useState("email"); // "email" | "code"
@@ -23,13 +24,6 @@ export function SignIn() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [googleBusy, setGoogleBusy] = useState(false);
-
-  const onGoogle = () => {
-    if (googleBusy) return;
-    setGoogleBusy(true);
-    signIn("google").catch(() => setGoogleBusy(false));
-  };
 
   const requestCode = async (e) => {
     e.preventDefault();
@@ -142,15 +136,6 @@ export function SignIn() {
             {error}
           </p>
         ) : null}
-
-        <div className="mt-6 pt-5 border-t border-border">
-          <p className="text-[11px] text-muted-foreground mb-3">
-            Email not working, or already have Google access?
-          </p>
-          <Button variant="ghost" className="w-full" onClick={onGoogle} disabled={googleBusy}>
-            {googleBusy ? "Redirecting…" : "Continue with Google"}
-          </Button>
-        </div>
       </div>
     </div>
   );
