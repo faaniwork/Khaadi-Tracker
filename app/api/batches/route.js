@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createFolder, getParentFolderId, mapWithConcurrency } from '@/lib/drive';
+import { getUserDriveAccessToken } from '@/lib/googleUserToken';
 import {
   assertReleaseNameFree,
   createReleaseRecord,
@@ -122,12 +123,30 @@ export async function POST(req) {
     // name never leaves an orphaned tree behind in Drive.
     await assertReleaseNameFree({ email, release: name });
 
+    // Created as the person asking, where their Google sign-in has Drive
+    // access, so the folders are owned by them and they can rename, move or
+    // trash them in Drive like any other folder they made. Falling back to
+    // the service account keeps this working for anyone who has not granted
+    // Drive access yet — their folders just belong to the app instead.
+    let accessToken;
+    let ownedBy = 'the app';
+    try {
+      accessToken = await getUserDriveAccessToken();
+      ownedBy = 'you';
+    } catch (e) {
+      if (e?.code !== 'DRIVE_ACCESS_REQUIRED') throw e;
+    }
+
     const outputId = await resolveOutputFolderId();
-    const batchFolder = await createFolder({ parentId: outputId, name });
+    const batchFolder = await createFolder({ parentId: outputId, name, accessToken });
 
     const created = [];
     for (const collection of planned) {
-      const colFolder = await createFolder({ parentId: batchFolder.id, name: collection.name });
+      const colFolder = await createFolder({
+        parentId: batchFolder.id,
+        name: collection.name,
+        accessToken,
+      });
       const dressNames = Array.from({ length: collection.count }, (_, i) => `Dress ${i + 1}`);
       // Sanity check on our own naming rather than on input: if this ever
       // stops matching, the folders would be created and then ignored by
@@ -136,7 +155,7 @@ export async function POST(req) {
         return bad('Internal: generated dress folder names the board would not count.', 500);
       }
       await mapWithConcurrency(dressNames, CONCURRENCY, (dressName) =>
-        createFolder({ parentId: colFolder.id, name: dressName })
+        createFolder({ parentId: colFolder.id, name: dressName, accessToken })
       );
       created.push({ collection: collection.name, folderId: colFolder.id, dresses: collection.count });
     }
@@ -155,6 +174,7 @@ export async function POST(req) {
       webViewLink: batchFolder.webViewLink || `https://drive.google.com/drive/folders/${batchFolder.id}`,
       collections: created,
       dresses: created.reduce((n, c) => n + c.dresses, 0),
+      ownedBy,
     });
   } catch (e) {
     const status = e?.status || (e?.code === 'VIEW_ONLY' ? 403 : 500);
