@@ -1,6 +1,7 @@
-import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, Folder, ChevronRight, Check, Ban } from "lucide-react";
+import { Shirt, Sparkles, LayoutGrid, ShieldAlert, Coins, ChevronRight, Check, Ban } from "lucide-react";
 import { fmt, shortRelease, MILESTONE_TARGET, RELEASE_LINKS } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
+import { DriveIcon } from "@/components/ui/drive-icon";
 import { MascotRider } from "@/components/mascot";
 import { BulkStatusControl } from "./status-select";
 import { CostInput } from "./dress-table";
@@ -163,9 +164,11 @@ export function BatchCard({ rel, rr, colCount, noteCount, cost, canEdit, sync, o
             href={relLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-xl bg-secondary border border-border text-foreground text-xs px-3 py-2 flex items-center gap-1.5 font-bold"
+            title="Open this batch in Google Drive"
+            aria-label="Open this batch in Google Drive"
+            className="rounded-xl bg-secondary border border-border text-foreground px-2.5 py-2 flex items-center font-bold"
           >
-            <Folder className="size-3.5" /> Drive
+            <DriveIcon className="size-4" />
           </a>
         ) : null}
       </div>

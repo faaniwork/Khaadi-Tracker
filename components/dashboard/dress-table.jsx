@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Coins, ExternalLink, Pencil, Check, X, Images } from "lucide-react";
+import { Coins, Pencil, Check, X, Images } from "lucide-react";
+import { DriveIcon } from "@/components/ui/drive-icon";
 import { timeAgo } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -195,8 +196,15 @@ export function CollectionCard({
         <div className="flex items-center gap-2 flex-wrap ml-auto">
           <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("collection", `${rel}␟${col}`, status, colRows.length)} />
           {colLink ? (
-            <a href={colLink} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-secondary border border-border text-foreground text-xs px-2.5 py-1.5 flex items-center gap-1">
-              <ExternalLink className="size-3" />
+            <a
+              href={colLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open this collection in Google Drive"
+              aria-label="Open this collection in Google Drive"
+              className="rounded-xl bg-secondary border border-border text-foreground px-2 py-1.5 flex items-center"
+            >
+              <DriveIcon className="size-3.5" />
             </a>
           ) : null}
         </div>
