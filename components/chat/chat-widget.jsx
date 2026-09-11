@@ -636,30 +636,44 @@ export function ChatWidget({ user, profiles }) {
 
       {/* The tab itself: a solid pill welded to the edge (rounded only on
           the side facing the page, flush and borderless on the side facing
-          off-screen), not a floating circular bubble. On hover it simply
-          bulges and slides out (translateX + a touch of scale) - a rotating
-          "nod" wobble was tried on top of this and undid exactly what made
-          it work: a plain, slow pull-out that reads as the tab starting to
-          open, not a shake. Anchored near the bottom, clear of the phone's
-          fixed tab bar below md the same way the toast is (see
-          components/toast.jsx). Hidden while the panel itself is open
-          rather than turned into a close button, since the panel already
-          has its own. */}
+          off-screen), not a floating circular bubble. On hover it bulges
+          outward - a rotating "nod" wobble was tried on top of this and
+          undid exactly what made it work: a plain, slow pull-out that reads
+          as the tab starting to open, not a shake.
+
+          Widening with scaleX rather than translateX: translating the
+          whole pill left, away from the true right edge, opened a gap
+          between the pill and the edge it's welded to - the page's own
+          background (a rounded card corner sitting behind it) showed
+          through that gap as an ugly notch. scaleX anchored at the right
+          edge (transformOrigin below) grows the pill open toward the left
+          instead, so its right edge never leaves the edge and there is
+          never a gap for anything to show through - it stays one
+          continuous bar the whole time, exactly like a boarding pass's own
+          QR-code tab being pulled open rather than sliding sideways off
+          the card.
+
+          Anchored near the bottom, clear of the phone's fixed tab bar
+          below md the same way the toast is (see components/toast.jsx).
+          Hidden while the panel itself is open rather than turned into a
+          close button, since the panel already has its own. */}
       {!open ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open chat"
-          className="fixed z-50 right-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-12 flex items-center justify-center h-14 w-11 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-transform duration-500 ease-out hover:-translate-x-2.5 hover:scale-105 active:scale-95"
+          className="group fixed z-50 right-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] md:bottom-12 flex items-center justify-center h-14 w-11 rounded-l-full bg-primary text-primary-foreground shadow-lg transition-transform duration-500 ease-out hover:scale-x-125 active:scale-x-95"
           style={{ transformOrigin: "right center" }}
         >
           {/* Nudged toward the flush edge, not the geometric centre of the
               box: rounded-l-full tapers the left side away, so a perfectly
-              centred icon reads as drifted toward that rounded side. */}
-          <MessageCircle className="size-5 translate-x-1" />
+              centred icon reads as drifted toward that rounded side.
+              Counter-scaled against the button's own scaleX so it stays a
+              circle instead of stretching into an oval as the pill widens. */}
+          <MessageCircle className="size-5 translate-x-1 transition-transform duration-500 ease-out group-hover:scale-x-[0.8] group-active:scale-x-[1.05]" />
           {pendingCount ? (
             <span
-              className="absolute top-1 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold"
+              className="absolute top-1 left-0.5 size-4 rounded-full grid place-items-center f-mono text-[9px] font-bold transition-transform duration-500 ease-out group-hover:scale-x-[0.8] group-active:scale-x-[1.05]"
               style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
             >
               {pendingCount}
