@@ -200,7 +200,10 @@ export function CollectionCard({
         </div>
         <div className="flex items-center gap-2 flex-wrap ml-auto">
           <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("collection", `${rel}␟${col}`, status, colRows.length)} />
-          {colLink ? (
+          {/* Drive is where the team manages files, not somewhere a viewer
+              or client should ever need to go - same call already made for
+              a file's own Drive link. */}
+          {colLink && canEdit ? (
             <a
               href={colLink}
               target="_blank"

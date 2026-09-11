@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
-import { Search, Sun, Moon, ArrowLeft, LogOut } from "lucide-react";
+import { Search, Sun, Moon, ArrowLeft, LogOut, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -114,6 +114,8 @@ export function Header({
   onSearch,
   theme,
   onToggleTheme,
+  onRefresh,
+  refreshing,
   user,
   myAvatar,
   onEditProfile,
@@ -177,6 +179,23 @@ export function Header({
               className="pl-9 pr-3 py-1.5 rounded-full w-[130px] focus:w-[190px] sm:w-[190px] sm:focus:w-[260px] transition-[width] duration-300 ease-out"
             />
           </div>
+
+          {/* One refresh, here, for the whole app - not a different small
+              icon repeated on Activity, on a batch's own tools, in a
+              dress's file panel, each doing the same "go get the current
+              state again" underneath. */}
+          {onRefresh ? (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              aria-label={refreshing ? "Refreshing" : "Refresh"}
+              title={refreshing ? "Refreshing" : "Refresh"}
+              className="size-8 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
+            </button>
+          ) : null}
 
           <button
             type="button"

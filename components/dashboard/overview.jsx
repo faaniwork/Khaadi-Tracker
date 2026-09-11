@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MascotRider } from "@/components/mascot";
 import { DriveIcon } from "@/components/ui/drive-icon";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BulkStatusControl } from "./status-select";
 import { CostInput } from "./dress-table";
 
@@ -54,6 +55,67 @@ function StatCell({ label, value, sub, colorVar, Icon, last }) {
         {/* Grayed out and small on purpose - this is the credit figure's own
             footnote, not a reading of equal weight next to it. */}
         {sub ? <span className="f-mono text-[11px] font-semibold text-muted-foreground">{sub}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Stands in for OverviewStats' own two sections - the stat strip and the
+ * Road to 1,000 bar it renders right below itself - while the board's
+ * first load is still in flight. Same grid, same cell borders, same
+ * roughly-there bar, so nothing shifts once the real numbers land. Always
+ * four stat cells: canEdit (which decides the fifth, Credit Cost) isn't
+ * known yet either at this point, and defaults to false until the role
+ * comes back with everything else.
+ */
+export function OverviewStatsSkeleton() {
+  return (
+    <>
+      <div className="grid grid-cols-2 lg:grid-cols-4 rounded-[14px] border border-border bg-card overflow-hidden mb-7">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={`p-4 border-b lg:border-b-0 border-border ${i === 3 ? "" : "lg:border-r"}`}>
+            <div className="flex items-center justify-between mb-3">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="size-4 rounded-full" />
+            </div>
+            <Skeleton className="h-7 w-12" />
+          </div>
+        ))}
+      </div>
+      <div className="mb-8">
+        <div className="flex items-baseline justify-between mb-2.5">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-3 w-28" />
+        </div>
+        <div className="mt-12">
+          <Skeleton className="h-2 w-full rounded-full" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Same footprint as one real BatchCard, so the grid it sits in doesn't
+ * reflow once actual batches arrive. */
+export function BatchCardSkeleton() {
+  return (
+    <div className="rounded-[14px] border border-border bg-card p-5 flex flex-col gap-4">
+      <div className="flex items-start gap-3.5">
+        <Skeleton className="size-14 rounded-full shrink-0" />
+        <div className="min-w-0 flex-1 pt-1">
+          <Skeleton className="h-4 w-28 mb-2" />
+          <Skeleton className="h-3 w-40" />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-8 w-24 rounded-[10px]" />
+        <Skeleton className="h-8 w-20 rounded-[10px]" />
+        <Skeleton className="h-8 w-14 rounded-[10px]" />
+      </div>
+      <Skeleton className="h-9 w-36 rounded-xl" />
+      <div className="pt-3 border-t border-border">
+        <Skeleton className="h-3 w-32" />
       </div>
     </div>
   );
@@ -314,16 +376,12 @@ export function BatchCard({
         </div>
       </div>
 
-      {/* A bulk-set action has nothing to show a viewer who can't use it, so
-          it goes away rather than sitting there disabled - same for cost,
-          a team concern hidden outright elsewhere on this same card.
-          Revisions stays for everyone: unlike the other two it is a
-          reading, not just an action, and worth seeing even read-only. */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {canEdit ? (
+      {/* All three are write actions with nothing to show someone who
+          can't use them - team-only tools, gone outright for a viewer
+          rather than sitting there disabled. */}
+      {canEdit ? (
+        <div className="flex items-center gap-2 flex-wrap">
           <BulkStatusControl onPick={(status) => onBulkStatus("release", rel, status, rr.length)} />
-        ) : null}
-        {canEdit ? (
           <CostInput
             scope="release"
             keyName={rel}
@@ -333,13 +391,13 @@ export function BatchCard({
             onChange={onCostChange}
             onRetry={() => onCostRetry("release", rel)}
           />
-        ) : null}
-        <RevisionsSelect
-          value={revisions || 0}
-          disabled={!canEdit}
-          onChange={(n) => onRevisionsChange(rel, n)}
-        />
-      </div>
+          <RevisionsSelect
+            value={revisions || 0}
+            disabled={!canEdit}
+            onChange={(n) => onRevisionsChange(rel, n)}
+          />
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2">
         <button
@@ -349,7 +407,9 @@ export function BatchCard({
         >
           View collections <ChevronRight className="size-3.5" />
         </button>
-        {relLink ? (
+        {/* Drive is where the team manages files, not somewhere a viewer
+            or client should ever need to go. */}
+        {relLink && canEdit ? (
           <a
             href={relLink}
             target="_blank"

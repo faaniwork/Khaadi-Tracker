@@ -24,7 +24,7 @@ import { ConfettiCanvas } from "@/components/confetti-canvas";
 import { Toast } from "@/components/toast";
 import { Sidebar, MobileNav } from "@/components/dashboard/nav";
 import { Header } from "@/components/dashboard/header";
-import { OverviewStats, OverviewChart, BatchCard } from "@/components/dashboard/overview";
+import { OverviewStats, OverviewChart, BatchCard, OverviewStatsSkeleton, BatchCardSkeleton } from "@/components/dashboard/overview";
 import { BatchPage } from "@/components/dashboard/batch-page";
 import { SearchResults } from "@/components/dashboard/search-results";
 import { ActivityPage } from "@/components/dashboard/activity";
@@ -97,6 +97,11 @@ function totalCost(costs) {
 
 export function Dashboard({ user }) {
   const [rows, setRows] = useState([]);
+  // Distinct from rows.length === 0 - that's a real, legitimate state (a
+  // brand new board with no batches yet), where this is "we don't know
+  // what's there yet." Flips once and stays true, so a later silent poll
+  // never drops the real content back into a skeleton.
+  const [loaded, setLoaded] = useState(false);
   const [costs, setCosts] = useState({ batches: {}, collections: {} });
   const [notes, setNotes] = useState({ batches: {} });
   const [role, setRole] = useState("viewer");
@@ -239,10 +244,34 @@ export function Dashboard({ user }) {
         if (!silent) showToast("Could not reach the sheet - retrying…", "error");
       } finally {
         inFlight.current = false;
+        // Either way, this was an actual attempt to find out what's there -
+        // an error still means "we know", not "we're still finding out",
+        // so the skeleton doesn't sit there forever if the very first load
+        // happens to fail.
+        setLoaded(true);
       }
     },
     [detectCelebrations, showToast]
   );
+
+  // One button in the header for "go get the current state again",
+  // wherever that state lives - the board's own rows/costs/etc. always,
+  // plus a bump to activityRefreshKey so an open Activity page (which
+  // fetches its own separate log, not part of the board payload) refetches
+  // too instead of needing its own duplicate refresh control.
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
+  const onRefresh = useCallback(async () => {
+    setManualRefreshing(true);
+    setActivityRefreshKey((k) => k + 1);
+    try {
+      // Not silent: this is a deliberate click, not a background poll, so
+      // a failure should actually say so rather than fail quietly.
+      await loadData(false);
+    } finally {
+      setManualRefreshing(false);
+    }
+  }, [loadData]);
 
   // Keeps session storage in step with wherever navigation actually lands,
   // so the lazy useState initializer above has something current to read
@@ -912,7 +941,7 @@ export function Dashboard({ user }) {
         </header>
         <main className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 py-5 sm:py-7">
           {clientView === "activity" ? (
-            <ActivityPage profiles={profiles} rows={rows} />
+            <ActivityPage profiles={profiles} rows={rows} refreshKey={activityRefreshKey} />
           ) : (
             <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
           )}
@@ -949,6 +978,8 @@ export function Dashboard({ user }) {
           onSearch={setSearch}
           theme={theme}
           onToggleTheme={onToggleTheme}
+          onRefresh={onRefresh}
+          refreshing={manualRefreshing}
           user={user}
           myAvatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
           onEditProfile={() => setEditingProfile(true)}
@@ -995,14 +1026,20 @@ export function Dashboard({ user }) {
             />
           ) : view.page === "overview" ? (
             <>
-              <OverviewStats
-                rows={rows}
-                totalCost={totalCost(costs)}
-                showCost={canEdit}
-                mascot={mascotState}
-                onMascotClick={onMascotClick}
-              />
-              <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
+              {loaded ? (
+                <>
+                  <OverviewStats
+                    rows={rows}
+                    totalCost={totalCost(costs)}
+                    showCost={canEdit}
+                    mascot={mascotState}
+                    onMascotClick={onMascotClick}
+                  />
+                  <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
+                </>
+              ) : (
+                <OverviewStatsSkeleton />
+              )}
               {/* lg:flex-1 lg:min-h-0 matches the inner scroll div below -
                   both were meant to only take effect once the desktop
                   layout stops the whole page from scrolling and hands
@@ -1060,7 +1097,13 @@ export function Dashboard({ user }) {
                   </Select>
                 </div>
               </div>
-              {visibleReleases.length ? (
+              {!loaded ? (
+                <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {[0, 1, 2].map((i) => (
+                    <BatchCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : visibleReleases.length ? (
                 <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto scrollbar-thin scroll-section -mx-1 px-1 pt-1 lg:pb-16">
                   <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 stagger">
                     {visibleReleases.slice(0, visibleBatches).map((rel) => {
@@ -1121,7 +1164,7 @@ export function Dashboard({ user }) {
               </div>
             </>
           ) : view.page === "activity" ? (
-            <ActivityPage profiles={profiles} rows={rows} onJump={onActivityJump} />
+            <ActivityPage profiles={profiles} rows={rows} refreshKey={activityRefreshKey} onJump={onActivityJump} />
           ) : view.page === "access" ? (
             <AccessPage role={role} currentEmail={user?.email} showToast={showToast} />
           ) : view.page === "outputs" ? (

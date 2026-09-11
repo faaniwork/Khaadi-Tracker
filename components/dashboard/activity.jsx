@@ -3,17 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Activity as ActivityIcon,
-  RefreshCw,
   Coins,
   MessageSquare,
   Tag,
   ShieldCheck,
   Image as ImageIcon,
   FolderSync,
-  Trash2,
-  Link2,
   Repeat2,
-  Plus,
 } from "lucide-react";
 import { timeAgo, fmt } from "@/lib/constants";
 import { fetchActivity } from "@/lib/api";
@@ -25,23 +21,28 @@ import { Avatar } from "@/components/ui/avatar";
  * The list used to be one undifferentiated grey column, which made a wall of
  * cost edits impossible to skim past to find the thing you actually wanted.
  * Colour comes from the KIND of change, so the eye can filter before reading.
+ *
+ * Kept deliberately few and broad rather than one bucket per exact field -
+ * "batch created" and "batch removed" used to be two separate filterable
+ * kinds for what is obviously the same category of thing, and credits vs.
+ * cost the same story once more. Fewer, plainer buckets: status, feedback
+ * (an approval, a rejection, a comment - the review workflow), images
+ * (one arriving from Drive or one being removed - the file itself existing
+ * or not), cost (credits and batch/collection cost alike), batch (created
+ * or removed), plus revisions/note/rename/access for the handful of things
+ * that don't fit anywhere else.
  */
 const KINDS = {
   status: { label: "status", icon: Tag, color: "var(--info)" },
   comments: { label: "comment", icon: MessageSquare, color: "var(--muted-foreground)" },
-  credits: { label: "credits", icon: Coins, color: "var(--warn)" },
-  revisions: { label: "revisions", icon: Repeat2, color: "var(--warn)" },
   cost: { label: "cost", icon: Coins, color: "var(--warn)" },
+  revisions: { label: "revisions", icon: Repeat2, color: "var(--warn)" },
   note: { label: "note", icon: MessageSquare, color: "var(--info)" },
   rename: { label: "rename", icon: Tag, color: "var(--primary)" },
   role: { label: "access", icon: ShieldCheck, color: "var(--destructive)" },
-  review: { label: "review", icon: ImageIcon, color: "var(--good)" },
-  file: { label: "file", icon: ImageIcon, color: "var(--good)" },
-  trash: { label: "file removed", icon: Trash2, color: "var(--destructive)" },
-  drive: { label: "Drive", icon: FolderSync, color: "var(--primary)" },
-  link: { label: "review link", icon: Link2, color: "var(--primary)" },
-  "batch created": { label: "batch created", icon: Plus, color: "var(--good)" },
-  "batch removed": { label: "batch removed", icon: Trash2, color: "var(--destructive)" },
+  feedback: { label: "feedback", icon: ImageIcon, color: "var(--good)" },
+  images: { label: "images", icon: FolderSync, color: "var(--primary)" },
+  batch: { label: "batch", icon: Tag, color: "var(--primary)" },
   default: { label: "change", icon: ActivityIcon, color: "var(--muted-foreground)" },
 };
 
@@ -86,15 +87,19 @@ function classify(entry) {
   const scope = entry.scope || "";
   const field = entry.field || "";
 
-  if (scope.startsWith("review-link:")) return KINDS.link;
   if (scope.startsWith("access:")) return KINDS.role;
   if (scope.startsWith("file:")) {
-    if (/trash/i.test(String(entry.newValue))) return KINDS.trash;
-    return KINDS.review;
+    // A file being removed is the same category as one arriving from
+    // Drive below - "images", not "feedback" - even though both happen
+    // to be logged against a file: scope.
+    if (/trash/i.test(String(entry.newValue))) return KINDS.images;
+    return KINDS.feedback;
   }
   if (/drive/i.test(field) || field === "added from Drive" || field === "back on the board") {
-    return KINDS.drive;
+    return KINDS.images;
   }
+  if (field === "credits") return KINDS.cost;
+  if (field === "batch created" || field === "batch removed") return KINDS.batch;
   return KINDS[field] || KINDS.default;
 }
 
@@ -133,7 +138,6 @@ function navTargetFor(entry, rows) {
   }
   if (scope.startsWith("note:")) return releaseTarget(scope.slice(5));
   if (scope.startsWith("collection:")) return releaseTarget(scope.slice(11));
-  if (scope.startsWith("review-link:")) return releaseTarget(scope.slice(12));
   // A batch itself - created, removed, or its revisions count changed.
   // Distinct from "cost:release:" above (a different, longer prefix).
   if (scope.startsWith("release:")) return releaseTarget(scope.slice(8));
@@ -163,7 +167,6 @@ function releaseFor(entry, rows) {
   }
   if (scope.startsWith("note:")) return scope.slice(5);
   if (scope.startsWith("collection:")) return scope.slice(11);
-  if (scope.startsWith("review-link:")) return scope.slice(12);
   if (scope.startsWith("release:")) return scope.slice(8);
   return null;
 }
@@ -178,7 +181,6 @@ function targetOf(entry) {
   if (scope.startsWith("note:")) return scope.replace("note:", "");
   if (scope.startsWith("collection:")) return scope.replace("collection:", "");
   if (scope.startsWith("access:")) return scope.replace("access:", "");
-  if (scope.startsWith("review-link:")) return scope.replace("review-link:", "");
   if (scope.startsWith("profile:")) return "";
   // Was falling through to the raw scope ("release:Sep 24 Release" showing
   // up verbatim, colon and all) for batch created/removed and per-release
@@ -196,9 +198,8 @@ function verbFor(entry, kind) {
     if (v.startsWith("rejected")) return "rejected";
     return "reviewed";
   }
-  if (scope.startsWith("review-link:")) return `${entry.field} a review link for`;
   if (scope.startsWith("bulk:")) return "set status in bulk on";
-  if (kind === KINDS.drive) return entry.field;
+  if (kind === KINDS.images && !scope.startsWith("file:")) return entry.field;
   return VERBS[entry.field] || `changed ${entry.field}`;
 }
 
@@ -231,17 +232,17 @@ function ValueChange({ entry }) {
   );
 }
 
-export function ActivityPage({ profiles, rows, onJump }) {
+export function ActivityPage({ profiles, rows, onJump, refreshKey }) {
   const [entries, setEntries] = useState(null);
   const [error, setError] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [kindFilter, setKindFilter] = useState("");
   const [batchFilter, setBatchFilter] = useState("");
 
-  // Runs once on mount. State is only ever set inside the promise's
-  // then/catch (never synchronously in the effect body), so there is no
-  // fetch-in-effect race with React's render — the effect just kicks the
-  // request off and lets it resolve on its own schedule.
+  // Fetches on mount, then again any time refreshKey changes - the header's
+  // one universal refresh button bumps it instead of this page keeping a
+  // duplicate refresh control of its own. State is only ever set inside the
+  // promise's then/catch (never synchronously in the effect body), so there
+  // is no fetch-in-effect race with React's render.
   useEffect(() => {
     let ignore = false;
     fetchActivity(300)
@@ -257,18 +258,7 @@ export function ActivityPage({ profiles, rows, onJump }) {
     return () => {
       ignore = true;
     };
-  }, []);
-
-  const refresh = () => {
-    setRefreshing(true);
-    fetchActivity(300)
-      .then((data) => {
-        setEntries(data.entries || []);
-        setError(null);
-      })
-      .catch((e) => setError(e.message || "Failed to load activity"))
-      .finally(() => setRefreshing(false));
-  };
+  }, [refreshKey]);
   const loading = entries === null && !error;
 
   // Grouped by day, so a long list reads as a timeline rather than 300
@@ -348,16 +338,6 @@ export function ActivityPage({ profiles, rows, onJump }) {
               ))}
             </select>
           ) : null}
-          <button
-            type="button"
-            onClick={refresh}
-            disabled={loading || refreshing}
-            className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
-            aria-label="Refresh activity"
-            title="Refresh"
-          >
-            <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          </button>
         </div>
       </div>
 

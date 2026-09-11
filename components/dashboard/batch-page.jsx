@@ -113,7 +113,9 @@ export function BatchPage({
               onChange={onCostChange}
               onRetry={() => onCostRetry("release", rel)}
             />
-            {relLink ? (
+            {/* Drive is where the team manages files, not somewhere a
+                viewer or client should ever need to go. */}
+            {relLink && canEdit ? (
               <a
                 href={relLink}
                 target="_blank"
