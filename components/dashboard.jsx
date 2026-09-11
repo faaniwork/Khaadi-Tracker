@@ -32,6 +32,7 @@ import { ProfileDialog } from "@/components/dashboard/profile-dialog";
 import { AccessPage } from "@/components/dashboard/access";
 import { OutputView } from "@/components/dashboard/output-view";
 import { Logo } from "@/components/ui/logo";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -282,12 +283,23 @@ export function Dashboard({ user }) {
     let ignore = false;
     fetchProfiles()
       .then((data) => {
-        if (!ignore) setProfiles({ byEmail: data.byEmail || {}, byName: data.byName || {} });
+        if (ignore) return;
+        const byEmail = data.byEmail || {};
+        setProfiles({ byEmail, byName: data.byName || {} });
+        // No row for this email at all means nobody has ever set a name or
+        // picture for this account - the first thing they land on, so
+        // "someone@gmail.com" is never the only way anyone else on the
+        // board can tell who they are. Only fires once: saving (or just
+        // closing) the dialog is what puts a row here, so it never opens
+        // again on its own after this first time.
+        const email = (user?.email || "").trim().toLowerCase();
+        if (email && !byEmail[email]) setEditingProfile(true);
       })
       .catch((e) => console.error("profiles load failed", e));
     return () => {
       ignore = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- user is a stable prop for this component's whole lifetime (sign-in reloads the page), not a value this effect needs to re-run on.
   }, []);
 
   useEffect(() => {
@@ -936,6 +948,19 @@ export function Dashboard({ user }) {
             </button>
             <button
               type="button"
+              onClick={() => setEditingProfile(true)}
+              title="Change your name and picture"
+              aria-label="Change your name and picture"
+              className="rounded-full transition-transform hover:scale-105"
+            >
+              <Avatar
+                name={profiles.byEmail[(user?.email || "").toLowerCase()]?.name || user?.name || user?.email}
+                avatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
+                size={28}
+              />
+            </button>
+            <button
+              type="button"
               onClick={() => signOut()}
               className="rounded-lg border border-border text-xs font-bold px-3 py-2 flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
             >
@@ -952,6 +977,19 @@ export function Dashboard({ user }) {
         </main>
         <Toast {...toast} />
         <ChatWidget user={user} profiles={profiles} />
+        <ProfileDialog
+          open={editingProfile}
+          user={user}
+          avatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
+          name={profiles.byEmail[(user?.email || "").toLowerCase()]?.name}
+          onSaved={(profile) =>
+            setProfiles((prev) => ({
+              byEmail: { ...prev.byEmail, [profile.email]: profile },
+              byName: profile.name ? { ...prev.byName, [profile.name]: profile } : prev.byName,
+            }))
+          }
+          onClose={() => setEditingProfile(false)}
+        />
       </div>
     );
   }

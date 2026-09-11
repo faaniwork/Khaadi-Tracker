@@ -19,9 +19,6 @@ export function Crumb({ view, onBack }) {
         <h1 className="f-heading text-xl sm:text-2xl font-semibold tracking-[-0.01em] leading-tight text-foreground">
           Production Board
         </h1>
-        <p className="text-sm mt-0.5 text-muted-foreground">
-          Khaadi × ImagineArt PDP shoot - every batch, tracked live
-        </p>
       </div>
     );
   }
