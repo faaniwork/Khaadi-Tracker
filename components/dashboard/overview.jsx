@@ -40,16 +40,16 @@ function BarRow({ label, pct, valueLabel }) {
 function StatCell({ label, value, sub, colorVar, Icon, last }) {
   return (
     <div
-      className={`p-3.5 border-b lg:border-b-0 border-border ${last ? "" : "lg:border-r"}`}
+      className={`p-3 sm:p-3.5 border-b lg:border-b-0 border-border ${last ? "" : "lg:border-r"}`}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1.5 sm:mb-2">
         <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
           {label}
         </span>
         <Icon className="size-4" style={{ color: colorVar }} />
       </div>
       <div className="flex items-baseline gap-2">
-        <div className="f-mono text-[26px] leading-none font-medium tracking-[-0.02em] text-foreground">
+        <div className="f-mono text-[22px] sm:text-[26px] leading-none font-medium tracking-[-0.02em] text-foreground">
           {value}
         </div>
         {/* Grayed out and small on purpose - this is the credit figure's own
@@ -74,8 +74,8 @@ export function OverviewStatsSkeleton() {
     <>
       <div className="grid grid-cols-2 lg:grid-cols-4 rounded-[14px] border border-border bg-card overflow-hidden mb-5">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={`p-3.5 border-b lg:border-b-0 border-border ${i === 3 ? "" : "lg:border-r"}`}>
-            <div className="flex items-center justify-between mb-2">
+          <div key={i} className={`p-3 sm:p-3.5 border-b lg:border-b-0 border-border ${i === 3 ? "" : "lg:border-r"}`}>
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
               <Skeleton className="h-3 w-20" />
               <Skeleton className="size-4 rounded-full" />
             </div>
@@ -93,7 +93,7 @@ export function OverviewStatsSkeleton() {
             <Skeleton className="h-2 w-full rounded-full" />
           </div>
         </div>
-        <div>
+        <div className="hidden lg:block">
           <Skeleton className="h-4 w-36 mb-3" />
           <div className="flex flex-col gap-2">
             {[0, 1, 2, 3, 4].map((i) => (
@@ -227,10 +227,19 @@ export function MilestoneBar({ rows, mascot, onMascotClick }) {
   );
 }
 
+/**
+ * Desktop only, deliberately. Every number in here is already on the batch
+ * card for that batch - its ring, its percentage, its delivered count -
+ * sitting a few hundred pixels lower on the same screen. On a wide screen
+ * that repetition is free: it shares a row with the milestone bar and costs
+ * nothing that wasn't already empty. On a phone it cost a full screen of
+ * scrolling to reach the cards that say the same thing, which is the
+ * opposite of a summary.
+ */
 export function OverviewChart({ releases, rowsFor }) {
   if (!releases.length) return null;
   return (
-    <div>
+    <div className="hidden lg:block">
       <h2 className="f-heading text-sm font-semibold text-foreground mb-3">Delivered % by batch</h2>
       <div className="flex flex-col gap-2">
         {releases.map((rel) => {
