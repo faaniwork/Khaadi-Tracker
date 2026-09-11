@@ -64,9 +64,15 @@ export function Crumb({ view, onBack }) {
 /**
  * The two halves of the app.
  *
- * A filled pill rather than an underline: the underline sat directly above
- * the header's own border, so the top of every page had two horizontal rules
- * a few pixels apart doing the same job badly. A pill needs no rule at all.
+ * A filled segment rather than an underline: the underline sat directly
+ * above the header's own border, so the top of every page had two
+ * horizontal rules a few pixels apart doing the same job badly.
+ *
+ * Radii are nested deliberately - a 10px shell with 3px of padding wants a
+ * 7px inner, or the gap between the two curves reads as a mistake. Same
+ * 10px family as every input and select in the app rather than the pill it
+ * used to be, so the header stops looking like a pile of lozenges that
+ * wandered in from somewhere else.
  */
 function ModeTabs({ mode, onNav }) {
   const tabs = [
@@ -75,9 +81,9 @@ function ModeTabs({ mode, onNav }) {
   ];
   return (
     // The phone's bottom tab bar already switches Dashboard/Khaadi PDPs (see
-    // MobileNav in nav.jsx) - keeping this pill here too just repeated the
-    // same choice in two different places on the same screen.
-    <nav className="hidden md:flex items-center gap-1 rounded-full bg-secondary/70 p-1">
+    // MobileNav in nav.jsx) - keeping this here too just repeated the same
+    // choice in two different places on the same screen.
+    <nav className="hidden md:flex items-center h-8 p-[3px] rounded-[10px] bg-secondary/70">
       {tabs.map((t) => {
         const active = mode === t.id;
         return (
@@ -86,7 +92,7 @@ function ModeTabs({ mode, onNav }) {
             type="button"
             onClick={() => onNav(t.nav)}
             aria-current={active ? "page" : undefined}
-            className={`f-heading text-[13px] font-semibold px-3.5 py-1.5 rounded-full transition-all duration-200 ${
+            className={`f-heading h-full px-3 rounded-[7px] text-[13px] font-semibold transition-colors duration-200 ${
               active
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -97,6 +103,28 @@ function ModeTabs({ mode, onNav }) {
         );
       })}
     </nav>
+  );
+}
+
+/**
+ * Every icon control in the header is the same object: 32px square, same
+ * radius as the inputs beside it, no border of its own. They used to be
+ * full circles of two different sizes with the sign-out one living inside
+ * the account chip instead, which is most of why the row read as scattered
+ * rather than composed.
+ */
+function IconButton({ label, onClick, disabled, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="size-8 shrink-0 rounded-[10px] grid place-items-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -131,22 +159,25 @@ export function Header({
           a phone. */}
         <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 flex flex-wrap items-center gap-2 sm:gap-3 py-2.5 sm:h-14 sm:py-0">
         <ModeTabs mode={mode} onNav={onNav} />
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
-          {/* A bare green dot next to a search box was a pixel nobody could
-              interpret. It says what it means now, and only takes space
-              worth taking when something is actually wrong. */}
-          <span
-            title={live ? "Live: the board is in sync" : "Having trouble reaching the board"}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-[10.5px] font-semibold text-muted-foreground"
-          >
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1 sm:gap-1.5">
+          {/* Status annotations, deliberately a different class of object
+              than the controls beside them: smaller, pill-shaped, no fixed
+              height. Only the informative states get to take up room -
+              "Live" was a permanent green badge that said the same thing
+              forever, so the one state actually worth interrupting someone
+              for (offline) had to compete with it for attention. */}
+          {live ? null : (
             <span
-              className={`size-1.5 rounded-full ${live ? "animate-pulse" : ""}`}
-              style={{ background: live ? "var(--good)" : "var(--destructive)" }}
-            />
-            {live ? "Live" : "Offline"}
-          </span>
+              title="Having trouble reaching the board"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-semibold"
+              style={{ background: "var(--destructive)", color: "var(--destructive-foreground)" }}
+            >
+              <span className="size-1.5 rounded-full bg-current" />
+              Offline
+            </span>
+          )}
           {viewOnly ? (
-            <span className="f-mono text-[10.5px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border border-border bg-secondary text-muted-foreground">
+            <span className="hidden sm:inline-flex f-mono text-[10.5px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border border-border bg-secondary text-muted-foreground">
               View only
             </span>
           ) : null}
@@ -165,15 +196,18 @@ export function Header({
           ) : null}
 
           {/* Widens on focus, so it is out of the way until it is being
-              used and generous once it is. */}
-          <div className="relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+              used and generous once it is. Exactly 32px tall and on the
+              same 10px radius as every other control here - it used to be
+              a full capsule of a slightly different height, which is most
+              of what made this row read as mismatched. */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
             <Input
               type="text"
               value={search}
               onChange={(e) => onSearch(e.target.value)}
               placeholder="Search dress, collection, batch"
-              className="pl-9 pr-3 py-1.5 rounded-full w-[130px] focus:w-[190px] sm:w-[190px] sm:focus:w-[260px] transition-[width] duration-300 ease-out"
+              className="h-8 py-0 pl-8 pr-3 text-[13px] w-[132px] focus:w-[190px] sm:w-[190px] sm:focus:w-[260px] transition-[width] duration-300 ease-out"
             />
           </div>
 
@@ -182,54 +216,40 @@ export function Header({
               dress's file panel, each doing the same "go get the current
               state again" underneath. */}
           {onRefresh ? (
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={refreshing}
-              aria-label={refreshing ? "Refreshing" : "Refresh"}
-              title={refreshing ? "Refreshing" : "Refresh"}
-              className="size-8 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-50"
-            >
+            <IconButton label={refreshing ? "Refreshing" : "Refresh"} onClick={onRefresh} disabled={refreshing}>
               <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
-            </button>
+            </IconButton>
           ) : null}
+
+          <IconButton label="Toggle light and dark mode" onClick={onToggleTheme}>
+            {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </IconButton>
+
+          {/* A hairline instead of another gap: the tools and the person
+              using them are two different groups, and equal spacing between
+              every single item is what made five controls read as five
+              unrelated objects rather than two clusters. */}
+          <span aria-hidden="true" className="hidden sm:block w-px h-5 bg-border mx-0.5" />
 
           <button
             type="button"
-            onClick={onToggleTheme}
-            aria-label="Toggle light and dark mode"
-            title="Toggle theme"
-            className="size-8 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+            onClick={onEditProfile}
+            title="Change your name and picture"
+            aria-label="Change your name and picture"
+            className="h-8 shrink-0 flex items-center gap-2 pl-1 pr-1 md:pr-2.5 rounded-[10px] hover:bg-secondary transition-colors"
           >
-            {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </button>
-
-          <div className="flex items-center gap-2 pl-1 pr-1 py-1 rounded-full border border-border bg-secondary/50">
-            <button
-              type="button"
-              onClick={onEditProfile}
-              title="Change your picture"
-              aria-label="Change your picture"
-              className="rounded-full transition-transform hover:scale-105"
-            >
-              <Avatar name={user?.name || user?.email} avatar={myAvatar} size={26} />
-            </button>
+            <Avatar name={user?.name || user?.email} avatar={myAvatar} size={24} />
             <span
-              className="hidden md:inline text-xs font-semibold text-foreground max-w-[110px] truncate"
+              className="hidden md:inline text-[13px] font-semibold text-foreground max-w-[110px] truncate"
               title={user?.email}
             >
               {user?.name || user?.email}
             </span>
-            <button
-              type="button"
-              onClick={() => setConfirmingSignOut(true)}
-              title="Sign out"
-              aria-label="Sign out"
-              className="size-7 rounded-full grid place-items-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
-            >
-              <LogOut className="size-3.5" />
-            </button>
-          </div>
+          </button>
+
+          <IconButton label="Sign out" onClick={() => setConfirmingSignOut(true)}>
+            <LogOut className="size-4" />
+          </IconButton>
         </div>
       </div>
       <ConfirmDialog
@@ -241,7 +261,7 @@ export function Header({
         onCancel={() => setConfirmingSignOut(false)}
       />
       {view.page === "outputs" ? null : (
-        <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pb-4 sm:pb-5">
+        <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pb-3 sm:pb-3.5">
           <Crumb view={view} onBack={onBack} />
         </div>
       )}

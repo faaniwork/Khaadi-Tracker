@@ -24,7 +24,14 @@ import { ConfettiCanvas } from "@/components/confetti-canvas";
 import { Toast } from "@/components/toast";
 import { Sidebar, MobileNav } from "@/components/dashboard/nav";
 import { Header } from "@/components/dashboard/header";
-import { OverviewStats, OverviewChart, BatchCard, OverviewStatsSkeleton, BatchCardSkeleton } from "@/components/dashboard/overview";
+import {
+  OverviewStats,
+  OverviewChart,
+  MilestoneBar,
+  BatchCard,
+  OverviewStatsSkeleton,
+  BatchCardSkeleton,
+} from "@/components/dashboard/overview";
 import { BatchPage } from "@/components/dashboard/batch-page";
 import { SearchResults } from "@/components/dashboard/search-results";
 import { ActivityPage } from "@/components/dashboard/activity";
@@ -1051,7 +1058,7 @@ export function Dashboard({ user }) {
           // batches box) to a couple of pixels tall on a phone: both carry
           // overflow-hidden for their own rounded corners, and neither
           // needed to be a flex item at all outside of the lg: layout.
-          className={`flex-1 min-h-0 lg:flex lg:flex-col w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pt-4 sm:pt-7 ${
+          className={`flex-1 min-h-0 lg:flex lg:flex-col w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 pt-4 sm:pt-5 ${
             !searching && view.page === "overview"
               ? "overflow-y-auto lg:overflow-hidden pb-28 md:pb-16 lg:pb-0"
               : "overflow-y-auto scrollbar-thin pb-28 md:pb-16"
@@ -1070,14 +1077,19 @@ export function Dashboard({ user }) {
             <>
               {loaded ? (
                 <>
-                  <OverviewStats
-                    rows={rows}
-                    totalCost={totalCost(costs)}
-                    showCost={canEdit}
-                    mascot={mascotState}
-                    onMascotClick={onMascotClick}
-                  />
-                  <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
+                  <OverviewStats rows={rows} totalCost={totalCost(costs)} showCost={canEdit} />
+                  {/* Side by side from lg up rather than stacked: the two of
+                      them plus the stat strip used to cost over 400px before
+                      the first batch card, which on a laptop left the actual
+                      work below the fold. Sharing a row costs the height of
+                      the taller one instead of both, and stops five thin
+                      bars from spanning the full 1,440px to show five
+                      numbers. Still stacked on a phone, where there is only
+                      ever one column to give them. */}
+                  <div className="grid lg:grid-cols-2 gap-x-10 gap-y-6 mb-5">
+                    <MilestoneBar rows={rows} mascot={mascotState} onMascotClick={onMascotClick} />
+                    <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
+                  </div>
                 </>
               ) : (
                 <OverviewStatsSkeleton />

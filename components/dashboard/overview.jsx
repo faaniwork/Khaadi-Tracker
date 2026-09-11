@@ -15,8 +15,8 @@ import { CostInput } from "./dress-table";
 function BarRow({ label, pct, valueLabel }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-xs font-semibold w-16 shrink-0 truncate text-muted-foreground">{label}</span>
-      <div className="flex-1 rounded-full bg-muted overflow-hidden" style={{ height: 10 }}>
+      <span className="text-xs font-semibold w-14 shrink-0 truncate text-muted-foreground">{label}</span>
+      <div className="flex-1 rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
         <div
           className="h-full rounded-full transition-[width] duration-700"
           style={{ width: `${pct}%`, background: "var(--primary)" }}
@@ -40,16 +40,16 @@ function BarRow({ label, pct, valueLabel }) {
 function StatCell({ label, value, sub, colorVar, Icon, last }) {
   return (
     <div
-      className={`p-4 border-b lg:border-b-0 border-border ${last ? "" : "lg:border-r"}`}
+      className={`p-3.5 border-b lg:border-b-0 border-border ${last ? "" : "lg:border-r"}`}
     >
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
           {label}
         </span>
         <Icon className="size-4" style={{ color: colorVar }} />
       </div>
       <div className="flex items-baseline gap-2">
-        <div className="f-mono text-[28px] leading-none font-medium tracking-[-0.02em] text-foreground">
+        <div className="f-mono text-[26px] leading-none font-medium tracking-[-0.02em] text-foreground">
           {value}
         </div>
         {/* Grayed out and small on purpose - this is the credit figure's own
@@ -61,35 +61,45 @@ function StatCell({ label, value, sub, colorVar, Icon, last }) {
 }
 
 /**
- * Stands in for OverviewStats' own two sections - the stat strip and the
- * Road to 1,000 bar it renders right below itself - while the board's
- * first load is still in flight. Same grid, same cell borders, same
- * roughly-there bar, so nothing shifts once the real numbers land. Always
- * four stat cells: canEdit (which decides the fifth, Credit Cost) isn't
- * known yet either at this point, and defaults to false until the role
- * comes back with everything else.
+ * Stands in for the whole summary area - the stat strip, and the milestone
+ * bar and per-batch chart that sit side by side beneath it - while the
+ * board's first load is still in flight. Mirrors the real layout's own
+ * spacing and column split exactly, so nothing shifts once the numbers
+ * land. Always four stat cells: canEdit (which decides the fifth, Credit
+ * Cost) isn't known yet either at this point, and defaults to false until
+ * the role comes back with everything else.
  */
 export function OverviewStatsSkeleton() {
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 rounded-[14px] border border-border bg-card overflow-hidden mb-7">
+      <div className="grid grid-cols-2 lg:grid-cols-4 rounded-[14px] border border-border bg-card overflow-hidden mb-5">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={`p-4 border-b lg:border-b-0 border-border ${i === 3 ? "" : "lg:border-r"}`}>
-            <div className="flex items-center justify-between mb-3">
+          <div key={i} className={`p-3.5 border-b lg:border-b-0 border-border ${i === 3 ? "" : "lg:border-r"}`}>
+            <div className="flex items-center justify-between mb-2">
               <Skeleton className="h-3 w-20" />
               <Skeleton className="size-4 rounded-full" />
             </div>
-            <Skeleton className="h-7 w-12" />
+            <Skeleton className="h-6 w-12" />
           </div>
         ))}
       </div>
-      <div className="mb-8">
-        <div className="flex items-baseline justify-between mb-2.5">
-          <Skeleton className="h-3 w-24" />
-          <Skeleton className="h-3 w-28" />
+      <div className="grid lg:grid-cols-2 gap-x-10 gap-y-6 mb-5">
+        <div>
+          <div className="flex items-baseline justify-between mb-2.5">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-28" />
+          </div>
+          <div className="mt-12">
+            <Skeleton className="h-2 w-full rounded-full" />
+          </div>
         </div>
-        <div className="mt-12">
-          <Skeleton className="h-2 w-full rounded-full" />
+        <div>
+          <Skeleton className="h-4 w-36 mb-3" />
+          <div className="flex flex-col gap-2">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-2 w-full rounded-full" />
+            ))}
+          </div>
         </div>
       </div>
     </>
@@ -121,15 +131,11 @@ export function BatchCardSkeleton() {
   );
 }
 
-export function OverviewStats({ rows, totalCost, showCost = true, mascot, onMascotClick }) {
+export function OverviewStats({ rows, totalCost, showCost = true }) {
   const total = rows.length;
   const delivered = rows.filter((r) => r.status === "Delivered").length;
   const inProgress = rows.filter((r) => r.status === "In Progress").length;
   const revision = rows.filter((r) => r.status === "Needs Revision").length;
-  const goalPct = Math.min(100, (delivered / MILESTONE_TARGET) * 100);
-  // Kept off the very ends of the track so the speech bubble never hangs off
-  // the side of the page.
-  const ridePct = Math.max(6, Math.min(94, goalPct));
   // Cost per outfit: what a delivered dress actually costs once the whole
   // batch's credits are spread across it, not just the raw total anyone
   // could already add up themselves. Null rather than 0 with nothing
@@ -157,57 +163,76 @@ export function OverviewStats({ rows, totalCost, showCost = true, mascot, onMasc
   ];
 
   return (
-    <>
-      <div
-        className={`grid grid-cols-2 ${showCost ? "lg:grid-cols-5" : "lg:grid-cols-4"} rounded-[14px] border border-border bg-card overflow-hidden mb-7 rise`}
-      >
-        {cells.map((c, i) => (
-          <StatCell key={c.label} {...c} last={i === cells.length - 1} />
-        ))}
-      </div>
+    <div
+      className={`grid grid-cols-2 ${showCost ? "lg:grid-cols-5" : "lg:grid-cols-4"} rounded-[14px] border border-border bg-card overflow-hidden mb-5 rise`}
+    >
+      {cells.map((c, i) => (
+        <StatCell key={c.label} {...c} last={i === cells.length - 1} />
+      ))}
+    </div>
+  );
+}
 
-      {/* No card around this. It is one line of text and one bar; a border
-          and a panel would be more furniture than content. */}
-      <div className="mb-8" style={{ overflow: "visible" }}>
-        <div className="flex items-baseline justify-between mb-2.5">
-          <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
-            Road to 1,000
-          </span>
-          <span className="f-mono text-xs text-muted-foreground">
-            <span className="text-foreground font-medium">{fmt(delivered)}</span> of{" "}
-            {fmt(MILESTONE_TARGET)} · {goalPct.toFixed(1)}%
-          </span>
-        </div>
-        {/* The rider hangs off the top of the track, so the track needs its
-            own clearance below the label. It had 30px for a 42px mascot
-            before, which is precisely why the poor thing was sitting on top
-            of the words. */}
-        <div className="relative progress-zone mt-12">
-          <div className="rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
-            <div
-              className="h-full rounded-full transition-[width] duration-700"
-              style={{ width: `${goalPct}%`, background: "var(--primary)" }}
-            />
-          </div>
-          <MascotRider
-            mood={mascot?.mood}
-            message={mascot?.message}
-            active={mascot?.active}
-            leftPct={ridePct}
-            onClick={onMascotClick}
+/**
+ * Road to 1,000, with the mascot riding the track.
+ *
+ * Split out of OverviewStats so it can sit BESIDE the per-batch chart on a
+ * wide screen instead of above it. Stacked, the two of them plus the stat
+ * strip ate over 400px before a single batch card appeared - on a laptop
+ * that left the actual work squeezed into whatever was below the fold. Side
+ * by side they cost the height of the taller one instead of both, and the
+ * bars stop spanning 1,600px to show five numbers.
+ *
+ * No card around it. It is one line of text and one bar; a border and a
+ * panel would be more furniture than content.
+ */
+export function MilestoneBar({ rows, mascot, onMascotClick }) {
+  const delivered = rows.filter((r) => r.status === "Delivered").length;
+  const goalPct = Math.min(100, (delivered / MILESTONE_TARGET) * 100);
+  // Kept off the very ends of the track so the speech bubble never hangs off
+  // the side of the page.
+  const ridePct = Math.max(6, Math.min(94, goalPct));
+  return (
+    <div style={{ overflow: "visible" }}>
+      <div className="flex items-baseline justify-between mb-2.5">
+        <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
+          Road to 1,000
+        </span>
+        <span className="f-mono text-xs text-muted-foreground">
+          <span className="text-foreground font-medium">{fmt(delivered)}</span> of{" "}
+          {fmt(MILESTONE_TARGET)} · {goalPct.toFixed(1)}%
+        </span>
+      </div>
+      {/* The rider hangs off the top of the track, so the track needs its
+          own clearance below the label. It had 30px for a 42px mascot
+          before, which is precisely why the poor thing was sitting on top
+          of the words - this is the one measurement on this screen that
+          isn't free to tighten. */}
+      <div className="relative progress-zone mt-12">
+        <div className="rounded-full bg-muted overflow-hidden" style={{ height: 8 }}>
+          <div
+            className="h-full rounded-full transition-[width] duration-700"
+            style={{ width: `${goalPct}%`, background: "var(--primary)" }}
           />
         </div>
+        <MascotRider
+          mood={mascot?.mood}
+          message={mascot?.message}
+          active={mascot?.active}
+          leftPct={ridePct}
+          onClick={onMascotClick}
+        />
       </div>
-    </>
+    </div>
   );
 }
 
 export function OverviewChart({ releases, rowsFor }) {
   if (!releases.length) return null;
   return (
-    <div className="mb-8">
-      <h2 className="f-heading text-sm font-semibold text-foreground mb-4">Delivered % by batch</h2>
-      <div className="flex flex-col gap-2.5">
+    <div>
+      <h2 className="f-heading text-sm font-semibold text-foreground mb-3">Delivered % by batch</h2>
+      <div className="flex flex-col gap-2">
         {releases.map((rel) => {
           const rr = rowsFor(rel);
           const pct = rr.length ? (rr.filter((r) => r.status === "Delivered").length / rr.length) * 100 : 0;
