@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter, RefreshCw, LayoutGrid, Images } from "lucide-react";
+import { Activity, ShieldCheck, Sun, Moon, LogOut, Plus, Filter, LayoutGrid, Images } from "lucide-react";
 import { moodFor, mascotMessage, MASCOT_LINES, sortReleasesByRecency, RELEASE_LINKS, STATUS_OPTIONS } from "@/lib/constants";
 import {
   fetchBoard,
@@ -149,7 +149,6 @@ export function Dashboard({ user }) {
     Math.min(100, (rows.filter((r) => r.status === "Delivered").length / 1000) * 100)
   );
   const [pendingDelete, setPendingDelete] = useState(null);
-  const [checkingDrive, setCheckingDrive] = useState(false);
   const [releaseFolders, setReleaseFolders] = useState({});
   const [revisions, setRevisions] = useState({ batches: {} });
   const [clientView, setClientView] = useState("images"); // "images" | "activity" - a client's own two tabs
@@ -258,20 +257,11 @@ export function Dashboard({ user }) {
   // wherever that state lives - the board's own rows/costs/etc. always,
   // plus a bump to activityRefreshKey so an open Activity page (which
   // fetches its own separate log, not part of the board payload) refetches
-  // too instead of needing its own duplicate refresh control.
+  // too instead of needing its own duplicate refresh control. Defined below
+  // checkDrive, which it also folds in - see the onRefresh declaration
+  // further down for why.
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [activityRefreshKey, setActivityRefreshKey] = useState(0);
-  const onRefresh = useCallback(async () => {
-    setManualRefreshing(true);
-    setActivityRefreshKey((k) => k + 1);
-    try {
-      // Not silent: this is a deliberate click, not a background poll, so
-      // a failure should actually say so rather than fail quietly.
-      await loadData(false);
-    } finally {
-      setManualRefreshing(false);
-    }
-  }, [loadData]);
 
   // Keeps session storage in step with wherever navigation actually lands,
   // so the lazy useState initializer above has something current to read
@@ -746,7 +736,6 @@ export function Dashboard({ user }) {
   const checkDrive = useCallback(
     async ({ quiet } = {}) => {
       if (!canEdit) return;
-      setCheckingDrive(true);
       try {
         const res = await verifyBatches();
         if (res.removed?.length) {
@@ -766,8 +755,6 @@ export function Dashboard({ user }) {
         }
       } catch (e) {
         if (!quiet) showToast(e.message || "Could not check Drive", "error");
-      } finally {
-        setCheckingDrive(false);
       }
     },
     [canEdit, showToast, loadData]
@@ -782,6 +769,23 @@ export function Dashboard({ user }) {
     checkedOnce.current = true;
     checkDrive({ quiet: true });
   }, [canEdit, checkDrive]);
+
+  // The header's one refresh button, folding in what the batches area's own
+  // "Check Drive" button used to do on its own - a click here now reloads
+  // the board, verifies every batch still exists in Drive, and (if
+  // Activity happens to be open) refetches its separate log too, instead
+  // of three different small refresh controls scattered across the page.
+  const onRefresh = useCallback(async () => {
+    setManualRefreshing(true);
+    setActivityRefreshKey((k) => k + 1);
+    try {
+      // Not silent: this is a deliberate click, not a background poll, so
+      // a failure should actually say so rather than fail quietly.
+      await Promise.all([loadData(false), checkDrive()]);
+    } finally {
+      setManualRefreshing(false);
+    }
+  }, [loadData, checkDrive]);
 
   const onNav = useCallback((target) => {
     if (target === "overview") setView({ page: "overview", batch: null });
@@ -1055,8 +1059,9 @@ export function Dashboard({ user }) {
                   cleared the last card from behind the phone's tab bar. */}
               <div className="lg:flex-1 lg:min-h-0 flex flex-col rounded-[14px] border border-border bg-card/40 px-4 pt-3.5 pb-1 mb-1">
               {/* No "Batches" heading - "Add batch" already says what this
-                  section is without repeating itself, and Check Drive drops
-                  to an icon since its tooltip already carries the meaning. */}
+                  section is without repeating itself. Check Drive used to
+                  be its own icon button here; the header's one universal
+                  refresh now folds that check in instead. */}
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 {statusFilter ? (
                   <span className="text-xs text-muted-foreground">
@@ -1066,18 +1071,6 @@ export function Dashboard({ user }) {
                 {canEdit ? (
                   <Button size="sm" variant="ghost" onClick={() => setAddingBatch(true)}>
                     <Plus className="size-3.5" /> Add batch
-                  </Button>
-                ) : null}
-                {canEdit ? (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => checkDrive()}
-                    disabled={checkingDrive}
-                    aria-label={checkingDrive ? "Checking Drive" : "Check every batch still exists in Drive"}
-                    title={checkingDrive ? "Checking Drive" : "Check every batch still exists in Drive"}
-                  >
-                    <RefreshCw className={`size-3.5 ${checkingDrive ? "animate-spin" : ""}`} />
                   </Button>
                 ) : null}
                 <div className="ml-auto flex items-center gap-1.5">
