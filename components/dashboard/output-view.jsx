@@ -19,7 +19,7 @@ function sortedReleases(rows) {
  * a tinted circle ever could, and it is why every tile here looks like a
  * cover, not a list row with a label.
  */
-function CoverThumb({ dressId, className }) {
+function CoverThumb({ dressId, className, onFileCount }) {
   const [fileId, setFileId] = useState(undefined); // undefined = loading, null = none found
   useEffect(() => {
     let ignore = false;
@@ -27,8 +27,17 @@ function CoverThumb({ dressId, className }) {
     driveList({ dressId })
       .then((data) => {
         if (ignore) return;
-        const first = (data.files || []).find((f) => !f.isFolder && f.isImage);
+        const files = data.files || [];
+        const first = files.find((f) => !f.isFolder && f.isImage);
         setFileId(first ? first.id : null);
+        // The dress row's own `files` count (dresses.files in D1) is only
+        // ever as fresh as the last "Resync from Drive" click - it does not
+        // move on its own as pictures are uploaded or removed, so it drifts
+        // and sits wrong indefinitely. This request is already being made
+        // for the cover photo, so the real count comes along for free: the
+        // one place in this view that shows "N files" uses this instead of
+        // that stale column.
+        onFileCount?.(files.filter((f) => !f.isFolder).length);
       })
       .catch(() => {
         if (!ignore) setFileId(null);
@@ -36,7 +45,7 @@ function CoverThumb({ dressId, className }) {
     return () => {
       ignore = true;
     };
-  }, [dressId]);
+  }, [dressId, onFileCount]);
 
   if (fileId) {
     return (
@@ -61,7 +70,14 @@ function CoverThumb({ dressId, className }) {
  * collection, dress) rather than an icon-in-a-box list row — the picture
  * carries the content, the chrome stays out of the way.
  */
-function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide }) {
+function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide, liveFileCount }) {
+  // Starts as whatever the caller passed (the board's own cached count, so
+  // there is something to show immediately) and is replaced the moment the
+  // cover photo's own fetch reports the real number - see the onFileCount
+  // comment in CoverThumb for why that fetch is the source of truth here.
+  const [count, setCount] = useState(null);
+  const displaySubtitle = liveFileCount && count != null ? `${count} file${count === 1 ? "" : "s"}` : subtitle;
+
   return (
     <button
       type="button"
@@ -70,7 +86,11 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide }) {
         wide ? "aspect-[4/3]" : "aspect-[4/5]"
       }`}
     >
-      <CoverThumb dressId={coverDressId} className="absolute inset-0 size-full object-cover object-top" />
+      <CoverThumb
+        dressId={coverDressId}
+        className="absolute inset-0 size-full object-cover object-top"
+        onFileCount={liveFileCount ? setCount : undefined}
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
       {badge ? (
         <span
@@ -84,7 +104,7 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide }) {
         <p className="font-bold text-white text-base leading-snug truncate" style={{ textShadow: "0 1px 3px rgba(0,0,0,.5)" }}>
           {title}
         </p>
-        <p className="text-xs text-white/80 mt-0.5">{subtitle}</p>
+        <p className="text-xs text-white/80 mt-0.5">{displaySubtitle}</p>
       </div>
     </button>
   );
@@ -270,6 +290,7 @@ export function OutputView({
               coverDressId={r.id}
               title={r.dress}
               subtitle={`${r.files != null ? r.files : "-"} files`}
+              liveFileCount
               badge={r.status === "Delivered" ? "Delivered" : null}
               onClick={() => setDress(r)}
             />

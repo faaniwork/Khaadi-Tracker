@@ -56,7 +56,10 @@ function NavRing({ pct, icon: Icon, discarded }) {
       pct={pct}
       size={44}
       color={complete ? "var(--good)" : undefined}
-      label={complete ? <Check className="size-4" style={{ color: "var(--good)" }} /> : rounded ? String(rounded) : ""}
+      // A blank ring at 0% read as a broken avatar rather than "nothing
+      // delivered yet" - "0%" says that plainly, same as every other
+      // percentage. undefined falls through to Ring's own "N%" default.
+      label={complete ? <Check className="size-4" style={{ color: "var(--good)" }} /> : undefined}
     />
   );
 }

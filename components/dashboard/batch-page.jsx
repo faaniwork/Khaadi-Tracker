@@ -63,16 +63,15 @@ export function BatchPage({
             pct={allDiscarded ? 100 : pct}
             size={60}
             color={allDiscarded ? "var(--destructive)" : complete ? "var(--good)" : undefined}
+            // A blank ring at 0% used to read as a broken avatar rather than
+            // as "nothing delivered yet" - "0%" says that plainly, the same
+            // way the ring already speaks for every other percentage.
             label={
               allDiscarded ? (
                 <Ban className="size-5" style={{ color: "var(--destructive)" }} />
               ) : complete ? (
                 <Check className="size-5" style={{ color: "var(--good)" }} />
-              ) : Math.round(pct) ? (
-                undefined
-              ) : (
-                ""
-              )
+              ) : undefined
             }
           />
           <div className="flex-1 min-w-[180px]">

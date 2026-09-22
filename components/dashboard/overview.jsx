@@ -362,15 +362,15 @@ export function BatchCard({
   // A fully delivered batch shows a checkmark in the ring, which already says
   // "complete" without a separate badge repeating it in the corner.
   const ringColor = allDiscarded ? "var(--destructive)" : complete ? "var(--good)" : undefined;
+  // A blank ring at 0% used to read as a broken avatar rather than as
+  // "nothing delivered yet" - "0%" says that plainly, the same way the ring
+  // already speaks for every other percentage. undefined here falls through
+  // to Ring's own default "N%" label.
   const ringLabel = allDiscarded ? (
     <Ban className="size-5" style={{ color: "var(--destructive)" }} />
   ) : complete ? (
     <Check className="size-5" style={{ color: "var(--good)" }} />
-  ) : Math.round(pct) ? (
-    undefined
-  ) : (
-    ""
-  );
+  ) : undefined;
 
   // The ring's own checkmark already says "fully delivered" - repeating the
   // count right next to it ("13 dresses · 13 delivered") was saying the
