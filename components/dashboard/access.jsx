@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 import { Trash2, UserPlus } from "lucide-react";
 import { Input, Select } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { timeAgo } from "@/lib/constants";
 import { fetchAccess, saveAccess, deleteAccess } from "@/lib/api";
+
+// A join younger than this gets the "New" pill next to its email - long
+// enough that opening Access once doesn't retroactively make everyone look
+// old, short enough that the pill still means something.
+const NEW_JOIN_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+function markNew(row, now) {
+  return Boolean(row.createdAt) && now - row.createdAt < NEW_JOIN_WINDOW_MS;
+}
 
 const ROLE_HINT = {
   admin: "Full access - can edit everything and manage who has access.",
@@ -42,7 +52,11 @@ export function AccessPage({ role, currentEmail, showToast }) {
     fetchAccess()
       .then((data) => {
         if (ignore) return;
-        setList(data.list || []);
+        // Computed here, once, when the list actually arrives - not read
+        // straight off Date.now() in render, which would recompute on
+        // every unrelated re-render for no reason.
+        const now = Date.now();
+        setList((data.list || []).map((r) => ({ ...r, isNew: markNew(r, now) })));
         setError(null);
       })
       .catch((e) => {
@@ -170,6 +184,14 @@ export function AccessPage({ role, currentEmail, showToast }) {
                     {r.email}
                     {r.email === currentEmail ? (
                       <span className="ml-1.5 text-[10px] font-bold text-muted-foreground">(you)</span>
+                    ) : r.isNew ? (
+                      <span
+                        className="ml-1.5 f-mono text-[9.5px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full align-middle"
+                        style={{ background: "var(--destructive)", color: "var(--destructive-foreground)" }}
+                        title={`Joined ${timeAgo(r.createdAt)}`}
+                      >
+                        New
+                      </span>
                     ) : null}
                   </td>
                   <td className="py-2.5 px-3">

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { removeFileFromBoard, assertFileInDress } from '@/lib/drive';
-import { recordLog } from '@/lib/db';
+import { recordLog, adjustDressFileCount } from '@/lib/db';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 /**
@@ -33,6 +33,10 @@ export async function DELETE(req) {
     // folder id here would trash a whole dress or collection.
     const { file } = await assertFileInDress({ fileId, dressFolderId: dress.id });
     const removed = await removeFileFromBoard({ fileId, dressFolderId: dress.id });
+    // Whichever way it left (real Drive trash or the Removed-folder
+    // fallback - see removeFileFromBoard), it's out of the dress's visible
+    // set either way, so the board's own count follows it down.
+    await adjustDressFileCount(dress.id, -1);
 
     await recordLog({
       by: caller.by,

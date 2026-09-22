@@ -1,4 +1,4 @@
-import { LayoutGrid, Ban } from "lucide-react";
+import { LayoutGrid, Ban, Check } from "lucide-react";
 import { Ring } from "@/components/ui/ring";
 import { Logo } from "@/components/ui/logo";
 
@@ -11,61 +11,31 @@ import { Logo } from "@/components/ui/logo";
  * dead batch look like a batch that had not started.
  *
  *   discarded  solid red ring with a slash, and the label struck through
- *   0%         empty ring with NO number, since a bare "0" reads as noise
- *   anything   the usual progress ring with its percentage
- */
-/**
- * A batch's ring.
- *
- * Three states worth telling apart, because two of them used to look the
- * same. A batch where everything was discarded and a batch where nothing has
- * been delivered yet both drew an empty ring with "0" in it, which made a
- * dead batch look like a batch that had not started.
- *
- *   discarded  solid red ring with a slash, and the label struck through
+ *   complete   green ring with a checkmark, not the literal number "100" -
+ *              same treatment the batch cards on Overview already use, so a
+ *              finished batch reads as finished at a glance instead of as
+ *              a number that happens to be 100
  *   0%         empty ring with NO number, since a bare "0" reads as noise
  *   anything   the usual progress ring with its percentage
  *
- * SELECTED is the ring FILLING IN, rather than anything drawn beside it or
- * any weakening of its neighbours. Outline against solid is a difference you
- * cannot miss and it happens on the item itself, which is what the bar on
- * the sidebar's edge and the dimming of every other batch were both failing
- * to do: one added a shape that read as a glitch, the other made the
- * information harder to read to make one item stand out.
+ * SELECTED used to be its own separate shape entirely: the ring inverted to
+ * a solid filled circle with the number floating on top. At 0% that number
+ * is deliberately blank (see above), which meant the selected batch's own
+ * icon rendered as a plain, informationless blob - exactly the "weird"
+ * circle this was reported as. The ring itself now stays IDENTICAL whether
+ * selected or not - same shape, same colour, same checkmark-at-100 - so it
+ * never loses information for being selected. Selection is instead a pill
+ * of background colour behind the whole button, the same device the header's
+ * own mode tabs already use for "which one is active" - one visual language
+ * for the same question, not two.
  */
-function NavRing({ pct, icon: Icon, discarded, selected }) {
+function NavRing({ pct, icon: Icon, discarded }) {
   // The sidebar no longer carries an "All" entry (see navItems in
   // dashboard.jsx), so an icon item is only ever Activity/Access now.
-  const isIconItem = Boolean(Icon);
-
-  if (selected) {
-    const fill = discarded ? "var(--destructive)" : "var(--foreground)";
-    const ink = discarded ? "var(--destructive-foreground)" : "var(--background)";
-    const DisplayIcon = Icon || LayoutGrid;
-    const rounded = Math.round(pct || 0);
-    return (
-      <div
-        className="grid place-items-center rounded-full shrink-0"
-        style={{ width: 44, height: 44, background: fill }}
-      >
-        {isIconItem ? (
-          <DisplayIcon className="size-4" style={{ color: ink }} />
-        ) : discarded ? (
-          <Ban className="size-4" style={{ color: ink }} />
-        ) : (
-          <span className="f-mono font-bold" style={{ fontSize: 11, color: ink }}>
-            {rounded ? String(rounded) : ""}
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  if (isIconItem) {
-    const DisplayIcon = Icon || LayoutGrid;
+  if (Icon) {
     return (
       <div className="ring-chart" style={{ width: 44, height: 44, background: "var(--secondary)" }}>
-        <DisplayIcon className="size-4 text-foreground" />
+        <Icon className="size-4 text-foreground" />
       </div>
     );
   }
@@ -80,7 +50,32 @@ function NavRing({ pct, icon: Icon, discarded, selected }) {
     );
   }
   const rounded = Math.round(pct || 0);
-  return <Ring pct={pct} size={44} label={rounded ? String(rounded) : ""} />;
+  const complete = rounded >= 100;
+  return (
+    <Ring
+      pct={pct}
+      size={44}
+      color={complete ? "var(--good)" : undefined}
+      label={complete ? <Check className="size-4" style={{ color: "var(--good)" }} /> : rounded ? String(rounded) : ""}
+    />
+  );
+}
+
+/**
+ * "N new" - unread-count styling, not a status the way the batch rings are.
+ * Clamped to 9+ so a busy board never grows a badge wide enough to crowd
+ * the ring it sits on.
+ */
+function NavBadge({ count }) {
+  if (!count) return null;
+  return (
+    <span
+      className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full grid place-items-center f-mono text-[9.5px] font-bold leading-none shadow-sm"
+      style={{ background: "var(--destructive)", color: "var(--destructive-foreground)" }}
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
 }
 
 function NavButton({ it, isActive, onNav }) {
@@ -89,16 +84,21 @@ function NavButton({ it, isActive, onNav }) {
       type="button"
       onClick={() => onNav(it.id)}
       aria-current={isActive ? "page" : undefined}
-      title={it.discarded ? `${it.label} - all discarded` : it.label}
-      className="flex flex-col items-center gap-1.5 py-2.5 w-full rounded-xl transition-transform duration-200 hover:-translate-y-px"
+      title={
+        it.badge
+          ? `${it.label} - ${it.badge} new since you last looked`
+          : it.discarded
+            ? `${it.label} - all discarded`
+            : it.label
+      }
+      className={`relative flex flex-col items-center gap-1.5 py-2.5 w-full rounded-xl transition-[transform,background-color] duration-200 hover:-translate-y-px ${
+        isActive ? "bg-secondary" : ""
+      }`}
     >
-      <NavRing
-        id={it.id}
-        pct={it.pct}
-        icon={it.icon}
-        discarded={it.discarded}
-        selected={isActive}
-      />
+      <span className="relative">
+        <NavRing id={it.id} pct={it.pct} icon={it.icon} discarded={it.discarded} />
+        <NavBadge count={it.badge} />
+      </span>
       <span
         className={`f-mono text-[9.5px] uppercase tracking-wide ${
           isActive ? "font-bold text-foreground" : "font-semibold text-muted-foreground"
@@ -167,13 +167,16 @@ export function MobileNav({ tabs, active, onNav }) {
             key={it.id}
             type="button"
             onClick={() => onNav(it.id)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] active:scale-95 transition-transform"
+            className="relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] active:scale-95 transition-transform"
           >
-            <Icon
-              className="size-[22px]"
-              strokeWidth={isActive ? 2.4 : 2}
-              style={{ color: isActive ? "var(--foreground)" : "var(--muted-foreground)" }}
-            />
+            <span className="relative">
+              <Icon
+                className="size-[22px]"
+                strokeWidth={isActive ? 2.4 : 2}
+                style={{ color: isActive ? "var(--foreground)" : "var(--muted-foreground)" }}
+              />
+              <NavBadge count={it.badge} />
+            </span>
             <span
               className={`f-mono text-[10px] ${isActive ? "font-bold text-foreground" : "font-semibold text-muted-foreground"}`}
             >

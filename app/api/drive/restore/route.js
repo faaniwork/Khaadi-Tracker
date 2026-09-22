@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { listRemovedFiles, restoreRemovedFile, assertDriveId } from '@/lib/drive';
-import { recordLog } from '@/lib/db';
+import { recordLog, adjustDressFileCount } from '@/lib/db';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
 /**
@@ -48,6 +48,9 @@ export async function POST(req) {
     }
 
     await restoreRemovedFile({ fileId, dressFolderId: dress.id });
+    // The mirror image of the -1 on the way into the bin - back in the
+    // dress's visible set, back in its count.
+    await adjustDressFileCount(dress.id, 1);
     await recordLog({
       by: caller.by,
       scope: `file:${dress.id}`,

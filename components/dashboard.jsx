@@ -18,6 +18,7 @@ import {
   fetchProfiles,
   createBatch,
   deleteBatch,
+  markAccessViewed,
 } from "@/lib/api";
 import { burstConfetti } from "@/lib/confetti-bus";
 import { ConfettiCanvas } from "@/components/confetti-canvas";
@@ -113,6 +114,11 @@ export function Dashboard({ user }) {
   const [costs, setCosts] = useState({ batches: {}, collections: {} });
   const [notes, setNotes] = useState({ batches: {} });
   const [role, setRole] = useState("viewer");
+  // How many people have joined since this admin last opened Access - see
+  // getNewJoinCount in lib/db.js. Comes back as part of the normal board
+  // load, not its own request, since the badge has to be visible on the
+  // nav before anyone has clicked into Access at all.
+  const [newAccessCount, setNewAccessCount] = useState(0);
   const [live, setLive] = useState(true);
   // Restored from this tab's own session storage rather than defaulting to
   // Overview every time, so a phone refresh (or the browser reopening a
@@ -240,6 +246,7 @@ export function Dashboard({ user }) {
         });
         setNotes(data.notes || { batches: {} });
         setRole(data.role || "viewer");
+        setNewAccessCount(data.newAccessCount || 0);
         setDriveSync(data.driveSync || {});
         setReleaseFolders(data.releaseFolders || {});
         setRevisions(data.revisions || { batches: {} });
@@ -815,8 +822,18 @@ export function Dashboard({ user }) {
     else setView({ page: "outputs", batch: target });
     setSearch("");
     setStatusFilter("");
+    if (target === "access" && newAccessCount) {
+      // Cleared the moment the page opens, not on every click of the nav
+      // item elsewhere - someone landing on Access from a batch card via
+      // some other path is not "opening Access" for this purpose.
+      setNewAccessCount(0);
+      markAccessViewed().catch(() => {
+        // Worst case the badge reappears on the next load and they clear it
+        // again - better than the count silently going stale forever.
+      });
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [newAccessCount]);
 
   /**
    * Follows an activity entry to where it happened. A dress target opens its
@@ -860,9 +877,9 @@ export function Dashboard({ user }) {
       }),
       { id: "activity", label: "Activity", icon: Activity },
     ];
-    if (role === "admin") items.push({ id: "access", label: "Access", icon: ShieldCheck });
+    if (role === "admin") items.push({ id: "access", label: "Access", icon: ShieldCheck, badge: newAccessCount });
     return items;
-  }, [releases, rows, role]);
+  }, [releases, rows, role, newAccessCount]);
   // The phone's bottom tab bar: a handful of fixed destinations rather than
   // every batch pinned alongside them (see MobileNav in nav.jsx). Picking a
   // batch happens from a card inside Overview or Khaadi PDPs, same as the
@@ -873,9 +890,9 @@ export function Dashboard({ user }) {
       { id: "outputs", label: "Khaadi PDPs", icon: Images },
       { id: "activity", label: "Activity", icon: Activity },
     ];
-    if (role === "admin") tabs.push({ id: "access", label: "Access", icon: ShieldCheck });
+    if (role === "admin") tabs.push({ id: "access", label: "Access", icon: ShieldCheck, badge: newAccessCount });
     return tabs;
-  }, [role]);
+  }, [role, newAccessCount]);
   // A batch's own tools page (BatchPage) is reached FROM Khaadi PDPs, so it
   // lights up the same tab rather than leaving none of them highlighted.
   const mobileActiveId = view.page === "batch" ? "outputs" : view.page;

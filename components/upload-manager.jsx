@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Loader2, X, CheckCircle2, AlertCircle } from "lucide-react";
-import { driveUpload } from "@/lib/api";
+import { driveUpload, confirmUploadComplete } from "@/lib/api";
 
 /**
  * One upload queue for the whole app, mounted above every screen.
@@ -90,6 +90,15 @@ export function UploadProvider({ children }) {
             },
           });
           patch(next.id, { status: "done", progress: 1, result: res.file });
+          // A replacement overwrites an existing file's content - not a new
+          // file, so the dress's own file count doesn't move for it.
+          if (!next.replaceFileId) {
+            confirmUploadComplete({ dressId: next.dressId }).catch(() => {
+              // The upload itself already succeeded; a board count that's
+              // one behind until the next resync is a much smaller problem
+              // than surfacing this as an upload failure would be.
+            });
+          }
         } catch (e) {
           if (e?.name === "AbortError") {
             patch(next.id, { status: "cancelled" });
