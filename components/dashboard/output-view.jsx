@@ -131,7 +131,14 @@ function CollectionMosaicTile({ dressRows, onClick }) {
       type="button"
       onClick={onClick}
       className="group relative overflow-hidden rounded-[14px] border border-border card-hover aspect-[4/3] grid gap-0.5 bg-border"
-      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+      // gridAutoRows has to be explicit: rows default to auto-sized-by-
+      // content, and CoverThumb's own "size-full" (height:100%) can't
+      // resolve a percentage against an auto row with no defined height -
+      // the classic CSS trap where that silently collapses to each image's
+      // own intrinsic size instead, stretching the first row tall and
+      // burying every row after it. 1fr on both axes is what actually
+      // makes every cell an equal square slice of the card.
+      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: "1fr" }}
     >
       {dressRows.map((r) => (
         <CoverThumb key={r.id} dressId={r.id} className="size-full object-cover object-top" />
