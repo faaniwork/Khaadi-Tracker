@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Coins, Pencil, Check, X, Images } from "lucide-react";
+import { Coins, Pencil, Check, X, Images, ImageOff } from "lucide-react";
 import { DriveIcon } from "@/components/ui/drive-icon";
 import { timeAgo } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,54 @@ export function DressRow({ row, disabled, syncState, onFieldChange, onRetry, onO
         ) : null}
       </td>
     </tr>
+  );
+}
+
+/**
+ * "Which of these have anything shot at all" - a collection collapses by
+ * default, so this is the whole reason the question is answerable without
+ * opening every single one. A team paging through six collections to find
+ * the three nobody has started was exactly the blind spot this closes.
+ *
+ * Reads directly off row.files, the same per-dress count DressRow already
+ * shows next to "Browse" - resynced from Drive, not tracked separately, so
+ * this can never disagree with what opening the dress itself would show.
+ */
+function CollectionUploadBadge({ colRows }) {
+  const withFiles = colRows.filter((r) => (r.files || 0) > 0).length;
+  const total = colRows.length;
+  if (!total) return null;
+
+  if (withFiles === 0) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 f-mono text-[10.5px] font-bold px-2 py-1 rounded-full"
+        style={{ background: "var(--secondary)", color: "var(--muted-foreground)" }}
+        title="Nothing shot for any dress in this collection yet"
+      >
+        <ImageOff className="size-3" /> Empty
+      </span>
+    );
+  }
+  if (withFiles === total) {
+    return (
+      <span
+        className="inline-flex items-center gap-1 f-mono text-[10.5px] font-bold px-2 py-1 rounded-full"
+        style={{ background: "var(--good)", color: "var(--good-foreground)" }}
+        title="Every dress in this collection has at least one file"
+      >
+        <Images className="size-3" /> All shot
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 f-mono text-[10.5px] font-bold px-2 py-1 rounded-full"
+      style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
+      title={`${total - withFiles} of ${total} dresses in this collection have nothing uploaded yet`}
+    >
+      <Images className="size-3" /> {withFiles}/{total} shot
+    </span>
   );
 }
 
@@ -198,6 +246,10 @@ export function CollectionCard({
             {colRows.length} dress{colRows.length === 1 ? "" : "es"} · {delivered} delivered
           </p>
         </div>
+        {/* Sits right beside the title rather than buried in the table below
+            it, so it reads even while the collection is collapsed - the
+            whole point of it. */}
+        <CollectionUploadBadge colRows={colRows} />
         <div className="flex items-center gap-2 flex-wrap ml-auto">
           <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("collection", `${rel}␟${col}`, status, colRows.length)} />
           {/* Drive is where the team manages files, not somewhere a viewer

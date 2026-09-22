@@ -13,6 +13,9 @@ import {
   Undo2,
   Layers,
   Plus,
+  CheckSquare,
+  X as XIcon,
+  Check,
 } from "lucide-react";
 import {
   driveList,
@@ -36,6 +39,12 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PromptDialog } from "@/components/ui/prompt-dialog";
 import { Lightbox } from "@/components/files/lightbox";
 import { DownloadMenu } from "@/components/files/download-menu";
+
+// Stable across renders on purpose: handed out whenever the current folder
+// doesn't match the folder a selection was made in, so a `.has()` check
+// against it consistently comes back empty instead of allocating a fresh
+// Set every render.
+const EMPTY_SET = new Set();
 
 const STATUS_FILTERS = [
   { value: "", label: "All" },
@@ -141,6 +150,19 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   // A drop that overlaps what is already in the folder, parked here until
   // someone answers replace / skip / cancel.
   const [pendingDrop, setPendingDrop] = useState(null);
+  // Bulk selection: a folder's worth of tiles turned into checkboxes so a
+  // handful of pictures can be approved, rejected or removed together
+  // instead of one tap per photo per file.
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  // Which folder the selection above belongs to, so it can be scoped to
+  // that folder by comparison at render time (see below) rather than by an
+  // effect racing the grid to catch up after a navigation.
+  const [selectionFolder, setSelectionFolder] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [confirmBulkTrash, setConfirmBulkTrash] = useState(false);
+  const [bulkRejecting, setBulkRejecting] = useState(false);
+  const [bulkRejectError, setBulkRejectError] = useState("");
   const [busyIds, setBusyIds] = useState(() => new Set());
   const [postingCommentIds, setPostingCommentIds] = useState(() => new Set());
   const [rejecting, setRejecting] = useState(null);
@@ -223,6 +245,15 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       ignore = true;
     };
   }, [fetchFolder, currentFolder]);
+
+  // A selection is scoped to the folder it was made in - opening a version
+  // tab or stepping into a subfolder with three photos still ticked would
+  // let "Delete" reach files nobody looking at this screen can even see.
+  // Compared at render time rather than reset by an effect, so there is no
+  // frame where the OLD folder's selection paints against the NEW folder's
+  // grid before an effect catches up.
+  const isSelecting = selecting && selectionFolder === currentFolder;
+  const activeSelectedIds = isSelecting ? selectedIds : EMPTY_SET;
 
   // Showing what we have for a different folder would be misleading, so the
   // grid waits until the state describes the folder actually being viewed.
@@ -428,6 +459,97 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
     }
   };
 
+  // ---- bulk selection ----
+
+  const toggleSelect = (file) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(file.id)) next.delete(file.id);
+      else next.add(file.id);
+      return next;
+    });
+
+  const exitSelecting = () => {
+    setSelecting(false);
+    setSelectedIds(new Set());
+  };
+
+  const doBulkTrash = async () => {
+    const ids = Array.from(selectedIds);
+    setConfirmBulkTrash(false);
+    setBulkBusy(true);
+    // Fired together rather than one at a time - each of these is its own
+    // small server round trip, and waiting for twenty of them in sequence is
+    // exactly the kind of delay bulk actions exist to avoid.
+    const results = await Promise.allSettled(
+      ids.map((id) => driveTrashFile({ dressId: dress.id, fileId: id }))
+    );
+    const okIds = ids.filter((_, i) => results[i].status === "fulfilled");
+    setState((s) => ({ ...s, files: s.files.filter((f) => !okIds.includes(f.id)) }));
+    const failed = results.length - okIds.length;
+    if (failed) {
+      showToast?.(`Removed ${okIds.length} of ${ids.length} - ${failed} failed`, "error");
+    } else {
+      showToast?.(`Removed ${okIds.length} file${okIds.length === 1 ? "" : "s"}`, "ok");
+    }
+    setBulkBusy(false);
+    exitSelecting();
+  };
+
+  const doBulkApprove = async () => {
+    const ids = Array.from(selectedIds);
+    setBulkBusy(true);
+    const results = await Promise.allSettled(
+      ids.map((id) => {
+        const f = state.files.find((x) => x.id === id);
+        return driveReview({ dressId: dress.id, fileId: id, fileName: f?.name || "", decision: "approved" });
+      })
+    );
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") setReviewLocal(ids[i], r.value.review);
+    });
+    const failed = results.filter((r) => r.status === "rejected").length;
+    showToast?.(
+      failed ? `Approved ${ids.length - failed} of ${ids.length} - ${failed} failed` : `Approved ${ids.length} file${ids.length === 1 ? "" : "s"}`,
+      failed ? "error" : "ok"
+    );
+    setBulkBusy(false);
+    if (results.some((r) => r.status === "fulfilled" && r.value?.moved)) load(currentFolder);
+    exitSelecting();
+  };
+
+  const submitBulkReject = async ({ reason, feedbackText }) => {
+    const ids = Array.from(selectedIds);
+    setBulkBusy(true);
+    setBulkRejectError("");
+    const results = await Promise.allSettled(
+      ids.map((id) => {
+        const f = state.files.find((x) => x.id === id);
+        return driveReview({
+          dressId: dress.id,
+          fileId: id,
+          fileName: f?.name || "",
+          decision: "rejected",
+          reason,
+          feedbackText,
+        });
+      })
+    );
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") setReviewLocal(ids[i], r.value.review);
+    });
+    const failed = results.filter((r) => r.status === "rejected").length;
+    setBulkBusy(false);
+    setBulkRejecting(false);
+    if (failed) {
+      showToast?.(`Rejected ${ids.length - failed} of ${ids.length} - ${failed} failed`, "error");
+    } else {
+      showToast?.(`Rejected ${ids.length} file${ids.length === 1 ? "" : "s"}`, "ok");
+    }
+    load(currentFolder);
+    exitSelecting();
+  };
+
   /**
    * Starts the next revision round: creates V2 (or V3, V4...) inside the
    * dress and switches straight into it, because the only reason to make one
@@ -567,6 +689,24 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
           <DownloadMenu dresses={[dress]} showToast={showToast} />
+          {(reviewAllowed || canWrite) && visibleFiles.some((f) => !f.isFolder) ? (
+            <Button
+              variant={isSelecting ? "primary" : "ghost"}
+              size="sm"
+              onClick={() => {
+                if (isSelecting) {
+                  exitSelecting();
+                } else {
+                  setSelectionFolder(currentFolder);
+                  setSelectedIds(new Set());
+                  setSelecting(true);
+                }
+              }}
+              title="Select multiple files to approve, reject or remove together"
+            >
+              <CheckSquare className="size-3.5" /> <span className="hidden sm:inline">{isSelecting ? "Cancel" : "Select"}</span>
+            </Button>
+          ) : null}
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-xs">
             {STATUS_FILTERS.map((f) => (
               <option key={f.value} value={f.value}>
@@ -599,6 +739,66 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
           </Button>
         </div>
       </div>
+
+      {isSelecting ? (
+        <div className="flex items-center gap-2 flex-wrap mb-4 -mt-1 rounded-[10px] border border-border bg-secondary/50 px-3 py-2">
+          <span className="text-xs font-bold text-foreground">
+            {activeSelectedIds.size} selected
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedIds((prev) => {
+                const selectableIds = visibleFiles.filter((f) => !f.isFolder).map((f) => f.id);
+                return prev.size === selectableIds.length ? new Set() : new Set(selectableIds);
+              })
+            }
+            className="text-xs font-semibold text-primary hover:underline"
+          >
+            {activeSelectedIds.size === visibleFiles.filter((f) => !f.isFolder).length ? "Deselect all" : "Select all"}
+          </button>
+          <div className="ml-auto flex items-center gap-1.5 flex-wrap">
+            {reviewAllowed ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={!activeSelectedIds.size || bulkBusy}
+                  onClick={doBulkApprove}
+                  title="Approve selected"
+                >
+                  <Check className="size-3.5" style={{ color: "var(--good)" }} />{" "}
+                  <span className="hidden sm:inline">Approve</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={!activeSelectedIds.size || bulkBusy}
+                  onClick={() => {
+                    setBulkRejectError("");
+                    setBulkRejecting(true);
+                  }}
+                  title="Reject selected, with one reason for all of them"
+                >
+                  <XIcon className="size-3.5" style={{ color: "var(--destructive)" }} />{" "}
+                  <span className="hidden sm:inline">Reject</span>
+                </Button>
+              </>
+            ) : null}
+            {canWrite ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!activeSelectedIds.size || bulkBusy}
+                onClick={() => setConfirmBulkTrash(true)}
+                title="Remove selected"
+              >
+                <Trash2 className="size-3.5" /> <span className="hidden sm:inline">Remove</span>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {versions.length || canWrite ? (
         <div className="flex items-center gap-1.5 flex-wrap mb-4 pb-4 border-b border-border">
@@ -792,6 +992,9 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               file={f}
               dressId={dress.id}
               previewSrc={previewById.get(f.id)}
+              selectable={isSelecting && !f.isFolder}
+              selected={activeSelectedIds.has(f.id)}
+              onToggleSelect={toggleSelect}
               review={state.reviews[f.id]}
               comments={state.comments[f.id]}
               canWrite={canWrite}
@@ -847,6 +1050,23 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         confirmLabel="Remove"
         onConfirm={doTrash}
         onCancel={() => setConfirmTrash(null)}
+      />
+      <ConfirmDialog
+        open={confirmBulkTrash}
+        title={`Remove ${selectedIds.size} file${selectedIds.size === 1 ? "" : "s"}?`}
+        description="They stay in Drive."
+        confirmLabel={bulkBusy ? "Removing…" : "Remove"}
+        onConfirm={doBulkTrash}
+        onCancel={() => setConfirmBulkTrash(false)}
+      />
+      <RejectDialog
+        key={bulkRejecting ? Array.from(selectedIds).join(",") : "none"}
+        open={bulkRejecting}
+        fileName={`${selectedIds.size} file${selectedIds.size === 1 ? "" : "s"}`}
+        saving={bulkBusy}
+        error={bulkRejectError}
+        onSubmit={submitBulkReject}
+        onCancel={() => setBulkRejecting(false)}
       />
       <DuplicateDialog
         open={Boolean(pendingDrop)}

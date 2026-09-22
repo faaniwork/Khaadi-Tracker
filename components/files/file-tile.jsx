@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, MessageCircle, Trash2, Folder, FileText, Loader2, Send } from "lucide-react";
+import { Check, X, MessageCircle, Trash2, Folder, FileText, Loader2, Send, CircleCheck, Circle } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import { driveThumbUrl } from "@/lib/api";
 import { DriveIcon } from "@/components/ui/drive-icon";
@@ -104,6 +104,13 @@ export function FileTile({
   // exactly the moment someone is watching to see their picture arrive.
   // The bytes are already here, so show those instead.
   previewSrc,
+  // Bulk-select mode: while active, the tile's own click toggles selection
+  // instead of opening the lightbox, and a checkmark takes over the corner
+  // that the approve/reject badge normally owns (the two never show at
+  // once, so there is no real estate fight).
+  selectable,
+  selected,
+  onToggleSelect,
   review,
   comments,
   canWrite,
@@ -127,8 +134,9 @@ export function FileTile({
     return (
       <button
         type="button"
+        disabled={selectable}
         onClick={() => onOpenFolder?.(file)}
-        className="rounded-2xl border border-border bg-card p-4 flex flex-col items-center justify-center gap-2 aspect-square hover:border-primary transition-colors"
+        className="rounded-2xl border border-border bg-card p-4 flex flex-col items-center justify-center gap-2 aspect-square hover:border-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
       >
         <Folder className="size-7 text-muted-foreground" />
         <span className="text-xs font-bold text-foreground text-center break-words line-clamp-2">
@@ -146,21 +154,26 @@ export function FileTile({
   return (
     <div
       className="rounded-2xl border bg-card overflow-hidden flex flex-col relative"
-      style={{ borderColor: statusStyle?.color || "var(--border)", borderWidth: statusStyle ? 2 : 1 }}
+      style={{
+        borderColor: selected ? "var(--primary)" : statusStyle?.color || "var(--border)",
+        borderWidth: selected || statusStyle ? 2 : 1,
+      }}
     >
       <div className="relative aspect-square bg-secondary/60 flex items-center justify-center overflow-hidden">
         {file.isImage && !imgFailed ? (
           <button
             type="button"
-            onClick={() => onOpenLightbox?.(file)}
+            onClick={() => (selectable ? onToggleSelect?.(file) : onOpenLightbox?.(file))}
             // Warms the full-resolution image while the cursor is still on
             // its way to the click, so opening it is usually instant. Costs
             // nothing for anyone who never opens it.
             onMouseEnter={() => {
+              if (selectable) return;
               const img = new Image();
               img.src = driveThumbUrl({ fileId: file.id, dressId, size: 1600 });
             }}
-            aria-label={`View ${file.name} full screen`}
+            aria-label={selectable ? `Select ${file.name}` : `View ${file.name} full screen`}
+            aria-pressed={selectable ? selected : undefined}
             className="absolute inset-0 size-full group"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -170,14 +183,27 @@ export function FileTile({
               loading="lazy"
               decoding="async"
               onError={() => setImgFailed(true)}
-              className="absolute inset-0 size-full object-cover transition-transform duration-300 ease-out group-hover:scale-110"
+              className={`absolute inset-0 size-full object-cover transition-[transform,opacity] duration-300 ease-out ${
+                selectable ? "" : "group-hover:scale-110"
+              }`}
+              style={selected ? { opacity: 0.85 } : undefined}
             />
           </button>
         ) : (
           <FileText className="size-7 text-muted-foreground" />
         )}
 
-        {statusStyle ? (
+        {selectable ? (
+          <span
+            className="absolute top-2 left-2 size-6 rounded-full grid place-items-center shadow-sm pointer-events-none"
+            style={{
+              background: selected ? "var(--primary)" : "rgba(0,0,0,0.35)",
+              color: selected ? "var(--primary-foreground)" : "#fff",
+            }}
+          >
+            {selected ? <CircleCheck className="size-4" /> : <Circle className="size-4" />}
+          </span>
+        ) : statusStyle ? (
           <span
             className="absolute top-2 left-2 f-mono text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm"
             style={{ background: statusStyle.color, color: statusStyle.fg }}
@@ -222,7 +248,7 @@ export function FileTile({
           </p>
         ) : null}
 
-        <div className="mt-auto flex items-center flex-wrap gap-x-2 gap-y-1.5">
+        <div className={`mt-auto flex items-center flex-wrap gap-x-2 gap-y-1.5 ${selectable ? "opacity-40 pointer-events-none" : ""}`}>
           {canReview ? (
             <>
               <button
