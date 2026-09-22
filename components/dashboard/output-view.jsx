@@ -131,17 +131,25 @@ function CollectionMosaicTile({ dressRows, onClick }) {
       type="button"
       onClick={onClick}
       className="group relative overflow-hidden rounded-[14px] border border-border card-hover aspect-[4/3] grid gap-0.5 bg-border"
-      // gridAutoRows has to be explicit: rows default to auto-sized-by-
-      // content, and CoverThumb's own "size-full" (height:100%) can't
-      // resolve a percentage against an auto row with no defined height -
-      // the classic CSS trap where that silently collapses to each image's
-      // own intrinsic size instead, stretching the first row tall and
-      // burying every row after it. 1fr on both axes is what actually
-      // makes every cell an equal square slice of the card.
       style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: "1fr" }}
     >
       {dressRows.map((r) => (
-        <CoverThumb key={r.id} dressId={r.id} className="size-full object-cover object-top" />
+        // Each cell is `relative` and the image inside it `absolute inset-0`
+        // - not a normal-flow grid item. A normal-flow <img> here has no
+        // definite height to size against (percentage height can't resolve
+        // in a 1fr row until the row itself has a definite height, and the
+        // row doesn't until its content does - a circular dependency the
+        // browser resolves by falling back to the image's own intrinsic
+        // size), and that intrinsic size then grows the whole grid - and the
+        // card's aspect-[4/3] height along with it - well past where
+        // overflow-hidden clips it, which is what made every row after the
+        // first invisible. Taking the image out of flow entirely breaks the
+        // cycle: the cell's size comes only from the grid track, never from
+        // what's inside it. Same trick the single-photo tile above already
+        // uses for the same reason.
+        <div key={r.id} className="relative">
+          <CoverThumb dressId={r.id} className="absolute inset-0 size-full object-cover object-top" />
+        </div>
       ))}
     </button>
   );
