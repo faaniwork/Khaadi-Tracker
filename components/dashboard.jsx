@@ -165,7 +165,6 @@ export function Dashboard({ user }) {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [releaseFolders, setReleaseFolders] = useState({});
   const [revisions, setRevisions] = useState({ batches: {} });
-  const [clientView, setClientView] = useState("images"); // "images" | "activity" - a client's own two tabs
 
   const dirtyRows = useRef(new Set());
   const lastAttempt = useRef({});
@@ -927,96 +926,20 @@ export function Dashboard({ user }) {
     ? { text: `Saving ${savingCount}…`, kind: "saving", onClick: undefined }
     : null;
 
-  // A client account never sees the team's dashboard at all — no credits, no
-  // revisions, no batch editing, none of the internal tracking chrome. Just
-  // batches, collections, dresses, and the images inside them.
-  if (role === "client") {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="flex items-center gap-3 px-4 sm:px-6 py-3.5 border-b border-border bg-card sticky top-0 z-10">
-          <Logo width={40} />
-          <span className="f-heading font-bold text-sm text-foreground">Khaadi PDPs</span>
-          {/* A client still tracks what has happened to their own images -
-              just not the team's own cost/credit/status bookkeeping, which
-              getActivityLog itself now refuses to send a client account in
-              the first place. Two tabs, not a sidebar, because a client's
-              whole world here is these two things. */}
-          <div className="ml-auto flex items-center gap-1 rounded-full border border-border bg-secondary/40 p-0.5">
-            <button
-              type="button"
-              onClick={() => setClientView("images")}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
-                clientView === "images" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
-            >
-              Images
-            </button>
-            <button
-              type="button"
-              onClick={() => setClientView("activity")}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
-                clientView === "activity" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
-            >
-              Activity
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onToggleTheme}
-              className="size-8 rounded-lg grid place-items-center border border-border text-muted-foreground hover:text-foreground"
-              aria-label="Toggle theme"
-            >
-              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditingProfile(true)}
-              title="Change your name and picture"
-              aria-label="Change your name and picture"
-              className="rounded-full transition-transform hover:scale-105"
-            >
-              <Avatar
-                name={profiles.byEmail[(user?.email || "").toLowerCase()]?.name || user?.name || user?.email}
-                avatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
-                size={28}
-              />
-            </button>
-            <button
-              type="button"
-              onClick={() => signOut()}
-              className="rounded-lg border border-border text-xs font-bold px-3 py-2 flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="size-3.5" /> Sign out
-            </button>
-          </div>
-        </header>
-        <main className="w-full max-w-[1440px] mx-auto px-4 sm:px-7 xl:px-10 py-5 sm:py-7">
-          {clientView === "activity" ? (
-            <ActivityPage profiles={profiles} rows={rows} refreshKey={activityRefreshKey} />
-          ) : (
-            <OutputView rows={rows} showToast={showToast} canWrite={false} autoLatest />
-          )}
-        </main>
-        <Toast {...toast} />
-        <ChatWidget user={user} profiles={profiles} />
-        <ProfileDialog
-          open={editingProfile}
-          user={user}
-          avatar={profiles.byEmail[(user?.email || "").toLowerCase()]?.avatar}
-          name={profiles.byEmail[(user?.email || "").toLowerCase()]?.name}
-          onSaved={(profile) =>
-            setProfiles((prev) => ({
-              byEmail: { ...prev.byEmail, [profile.email]: profile },
-              byName: profile.name ? { ...prev.byName, [profile.name]: profile } : prev.byName,
-            }))
-          }
-          onClose={() => setEditingProfile(false)}
-        />
-      </div>
-    );
-  }
+  // A client used to be shut out of the team's dashboard entirely here -
+  // this whole branch rendered a separate, stripped-down shell (just
+  // Images/Activity tabs, no Overview, no batch list, no Sidebar) before
+  // falling through to anything else. Per direct request, a client now
+  // falls through to the exact same render everyone else gets, same as a
+  // viewer. That is safe without touching anything below for two reasons
+  // already true before this change: canEdit is false for client (see its
+  // definition above), so every write control - batch creation, status
+  // edits, cost inputs - is already hidden the same way it is for a viewer;
+  // and getBoardData (lib/db.js) strips credits/revisions/costs/notes for a
+  // client account at the DATA layer, not the UI layer, so those fields are
+  // simply absent from what reaches here regardless of which screen renders
+  // it. Approving/rejecting images still works exactly as before: OutputView
+  // hardcodes canReview={true} for anyone who reaches it, unconditionally.
 
   const searching = Boolean(search.trim());
   // A batch stays lit in the sidebar whether you are browsing its images or
