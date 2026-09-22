@@ -130,7 +130,7 @@ export async function POST(req) {
     // in that round. See smartImageName in lib/constants.js.
     const ext = String(name).includes('.') ? String(name).split('.').pop() : '';
     const { version, position } = await nameForUpload({ dressName: dress.dress, target, dressFolderId: dress.id });
-    const smartName = smartImageName({ dressName: dress.dress, version, position, ext });
+    const smartName = smartImageName({ dressName: dress.dress, collectionName: dress.collection, version, position, ext });
 
     const uploadUrl = await initResumableUpload({
       folderId: target,
