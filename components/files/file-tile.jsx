@@ -98,6 +98,12 @@ function CommentThread({ comments, canComment, posting, onAdd }) {
 export function FileTile({
   file,
   dressId,
+  // A local object URL for a file this browser just uploaded. Drive takes a
+  // little while to generate a thumbnail for brand new content, so straight
+  // after an upload its own thumbnail URL is a blank square - which is
+  // exactly the moment someone is watching to see their picture arrive.
+  // The bytes are already here, so show those instead.
+  previewSrc,
   review,
   comments,
   canWrite,
@@ -159,7 +165,7 @@ export function FileTile({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={driveThumbUrl({ fileId: file.id, dressId })}
+              src={previewSrc || driveThumbUrl({ fileId: file.id, dressId, v: file.modifiedTime })}
               alt={file.name}
               loading="lazy"
               decoding="async"

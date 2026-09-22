@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
-import { initResumableUpload, isWithinDress, getFile, listFolder } from '@/lib/drive';
+import {
+  initResumableUpload,
+  initResumableUpdate,
+  isWithinDress,
+  getFile,
+  getFileParents,
+  listFolder,
+} from '@/lib/drive';
 import { getUserDriveAccessToken } from '@/lib/googleUserToken';
+import { clearFileReview } from '@/lib/db';
 import { resolveCaller, assertCanWriteFiles, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 import { DRESS_VERSION_PATTERN, smartImageName } from '@/lib/constants';
 
@@ -41,7 +49,7 @@ async function resolveTargetFolder(dressFolderId, folderId) {
 }
 
 /**
- * POST /api/drive/upload-session   { dressId, folderId?, name, mimeType }
+ * POST /api/drive/upload-session   { dressId, folderId?, name, mimeType, replaceFileId? }
  *
  * Authorises the upload and hands back a Drive resumable-upload URL — no
  * file bytes pass through this route or this server at all. The browser
@@ -56,19 +64,12 @@ export async function POST(req) {
     const caller = await resolveCaller(req);
     assertCanWriteFiles(caller);
 
-    const { dressId, folderId, name, mimeType } = await req.json();
+    const { dressId, folderId, name, mimeType, replaceFileId } = await req.json();
     if (!dressId) return NextResponse.json({ error: 'dressId is required' }, { status: 400 });
     if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
 
     const dress = await assertDressInScope(caller, dressId);
     const target = await resolveTargetFolder(dress.id, folderId);
-
-    // Whatever the file was called on the way in, it lands in Drive named for
-    // what it actually is: which dress, which revision round, which picture
-    // in that round. See smartImageName in lib/constants.js.
-    const ext = String(name).includes('.') ? String(name).split('.').pop() : '';
-    const { version, position } = await nameForUpload({ dressName: dress.dress, target, dressFolderId: dress.id });
-    const smartName = smartImageName({ dressName: dress.dress, version, position, ext });
 
     // The browser's own follow-up PUT (see driveUpload in lib/api.js) will
     // carry this same Origin automatically since it's a cross-origin
@@ -82,9 +83,59 @@ export async function POST(req) {
     // this is the only way an upload can land in the shoot folders. Which
     // folder it may land in is still decided above, by us, not by them.
     const accessToken = await getUserDriveAccessToken();
+
+    // Replacing a picture that is already here: overwrite its contents and
+    // keep its id, its name and its position in the set. The id has to be
+    // checked against the folder we just authorised rather than taken on
+    // the caller's word - otherwise "replace" would be a way to overwrite
+    // any file in Drive this uploader account can reach, from a dress the
+    // caller does have access to.
+    if (replaceFileId) {
+      const existing = await getFileParents(replaceFileId);
+      const parents = existing?.parents || [];
+      // Anywhere inside this dress counts, not just the exact target folder:
+      // a rejected image lives in the dress's Rejected subfolder while still
+      // appearing in the main grid (see listDressFiles), and replacing a
+      // rejected shot with its correction is the commonest reason to replace
+      // anything at all.
+      const withinDress = (
+        await Promise.all(
+          parents.map((p) =>
+            p === dress.id ? true : isWithinDress({ folderId: p, dressFolderId: dress.id })
+          )
+        )
+      ).some(Boolean);
+      if (existing?.isFolder || !withinDress) {
+        return NextResponse.json({ error: 'That file is not in this dress.' }, { status: 404 });
+      }
+      // A replacement lands where the new upload was aimed. That matters for
+      // a rejected image: its correction belongs back in the set, not left
+      // behind in the Rejected folder wearing a verdict that was just cleared.
+      const strayParent = parents.find((p) => p !== target);
+      const uploadUrl = await initResumableUpdate({
+        fileId: replaceFileId,
+        originalFilename: name,
+        mimeType,
+        origin,
+        ...(parents.includes(target) ? {} : { addParents: target, removeParents: strayParent }),
+        accessToken,
+      });
+      // The verdict described the old pixels. See clearFileReview.
+      await clearFileReview(replaceFileId, caller.by);
+      return NextResponse.json({ uploadUrl, replaced: true });
+    }
+
+    // Whatever the file was called on the way in, it lands in Drive named for
+    // what it actually is: which dress, which revision round, which picture
+    // in that round. See smartImageName in lib/constants.js.
+    const ext = String(name).includes('.') ? String(name).split('.').pop() : '';
+    const { version, position } = await nameForUpload({ dressName: dress.dress, target, dressFolderId: dress.id });
+    const smartName = smartImageName({ dressName: dress.dress, version, position, ext });
+
     const uploadUrl = await initResumableUpload({
       folderId: target,
       name: smartName,
+      originalFilename: name,
       mimeType,
       origin,
       accessToken,

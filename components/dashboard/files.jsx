@@ -1,11 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { ArrowLeft, FolderPlus, RefreshCw, Loader2, Folder, Trash2, Undo2, Layers, Plus } from "lucide-react";
+import {
+  ArrowLeft,
+  FolderPlus,
+  RefreshCw,
+  Loader2,
+  Folder,
+  FileText,
+  Trash2,
+  Undo2,
+  Layers,
+  Plus,
+} from "lucide-react";
 import {
   driveList,
-  driveUpload,
   driveCreateFolder,
   driveTrashFile,
   driveRemovedFiles,
@@ -20,6 +30,8 @@ import { dressVersionNumber } from "@/lib/constants";
 import { FileTile } from "@/components/files/file-tile";
 import { RejectDialog } from "@/components/files/reject-dialog";
 import { Dropzone } from "@/components/files/dropzone";
+import { DuplicateDialog } from "@/components/files/duplicate-dialog";
+import { useUploads } from "@/components/upload-manager";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PromptDialog } from "@/components/ui/prompt-dialog";
 import { Lightbox } from "@/components/files/lightbox";
@@ -32,6 +44,76 @@ const STATUS_FILTERS = [
   { value: "commented", label: "Has comments" },
   { value: "rejected", label: "Rejected" },
 ];
+
+/**
+ * A picture that is on its way up, shown in the grid alongside the ones that
+ * have landed.
+ *
+ * The image is the local file itself, so it is on screen the instant it is
+ * dropped - no round trip, nothing to wait for. It sits at reduced opacity
+ * with its progress underneath until Drive confirms it, at which point the
+ * real tile takes its place.
+ */
+function PendingTile({ item }) {
+  const failed = item.status === "error";
+  return (
+    <div
+      className="rounded-2xl border bg-card overflow-hidden flex flex-col relative"
+      style={{ borderColor: failed ? "var(--destructive)" : "var(--border)" }}
+    >
+      <div className="relative aspect-square bg-secondary/60 grid place-items-center overflow-hidden">
+        {item.previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={item.previewUrl}
+            alt={item.name}
+            className="absolute inset-0 size-full object-cover"
+            style={{ opacity: failed ? 0.35 : 0.6 }}
+          />
+        ) : (
+          <FileText className="size-7 text-muted-foreground" />
+        )}
+        {failed ? (
+          <span
+            className="absolute top-2 left-2 f-mono text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm"
+            style={{ background: "var(--destructive)", color: "var(--destructive-foreground)" }}
+          >
+            Failed
+          </span>
+        ) : (
+          <span className="absolute inset-0 grid place-items-center">
+            <Loader2 className="size-5 animate-spin text-foreground" />
+          </span>
+        )}
+        {item.replaceFileId && !failed ? (
+          <span className="absolute top-2 left-2 f-mono text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm bg-foreground text-background">
+            Replacing
+          </span>
+        ) : null}
+      </div>
+      <div className="p-3">
+        <p className="text-[11px] text-muted-foreground truncate" title={item.name}>
+          {item.name}
+        </p>
+        {failed ? (
+          <p className="text-[11px] mt-1 line-clamp-2" style={{ color: "var(--destructive)" }}>
+            {item.error}
+          </p>
+        ) : (
+          <div className="mt-1.5 rounded-full bg-muted overflow-hidden" style={{ height: 4 }}>
+            <div
+              className="h-full rounded-full transition-[width] duration-200"
+              style={{
+                width: `${Math.round((item.progress || 0) * 100)}%`,
+                background: "var(--primary)",
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * The team's file browser for one dress, backed by its Drive folder.
@@ -53,7 +135,12 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   const [extraVersions, setExtraVersions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [trail, setTrail] = useState([]); // subfolders opened below the dress folder
-  const [upload, setUpload] = useState({ active: false, progress: 0 });
+  // The queue itself lives above this component so an upload outlives the
+  // screen that started it - see components/upload-manager.jsx.
+  const { enqueue, itemsFor, clearFinished } = useUploads();
+  // A drop that overlaps what is already in the folder, parked here until
+  // someone answers replace / skip / cancel.
+  const [pendingDrop, setPendingDrop] = useState(null);
   const [busyIds, setBusyIds] = useState(() => new Set());
   const [postingCommentIds, setPostingCommentIds] = useState(() => new Set());
   const [rejecting, setRejecting] = useState(null);
@@ -74,7 +161,10 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   // in a couple of seconds is the wrong shape for "you need to take an
   // action before anything else here will work", so this gets its own
   // dialog with the fix one tap away instead.
-  const [driveAccessIssue, setDriveAccessIssue] = useState("");
+  // Set once someone dismisses the current access-error message, so it does
+  // not reopen the dialog on every render while the same failure sits in the
+  // upload queue (see driveAccessIssue below).
+  const [dismissedAccessError, setDismissedAccessError] = useState("");
 
   const currentFolder = version ? version.id : trail.length ? trail[trail.length - 1].id : dress.id;
   const atRoot = !version && trail.length === 0;
@@ -146,52 +236,71 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       return next;
     });
 
-  const onFiles = async (files) => {
-    setUpload({ active: true, progress: 0 });
-    let done = 0;
-    let failed = 0;
-    let lastError = "";
-    let accessIssue = false;
-    for (const file of files) {
-      try {
-        await driveUpload({
-          dressId: dress.id,
-          folderId: currentFolder,
-          file,
-          onProgress: (p) => setUpload({ active: true, progress: (done + p) / files.length }),
-        });
-      } catch (e) {
-        failed += 1;
-        lastError = e.message || `Could not upload ${file.name}`;
-        // A DRIVE_ACCESS_REQUIRED here means Drive would not renew this
-        // person's sign-in (commonly the 7-day refresh-token limit on an
-        // app still in Google's "Testing" publishing state) - every
-        // remaining file in this batch is doomed the same way, so stop
-        // burning through them and surface the actual fix once instead of
-        // stacking up N identical failures.
-        if (e.code === "DRIVE_ACCESS_REQUIRED") {
-          accessIssue = true;
-          setDriveAccessIssue(e.message);
-          break;
-        }
-      }
-      done += 1;
-      setUpload({ active: true, progress: done / files.length });
+  /**
+   * What is in this folder already, keyed by the name it had on the machine
+   * it was uploaded from.
+   *
+   * It has to be that name, not the name in Drive: every upload is renamed
+   * to its position in the set on the way in (D2-V1-P7.jpg), so two
+   * unrelated pictures reliably end up with neighbouring names while the
+   * same picture uploaded twice ends up with two different ones.
+   *
+   * Files that predate Drive being told to record it report their Drive name
+   * instead, and are skipped - so the worst this does on old folders is fail
+   * to notice a duplicate, never invent one.
+   */
+  const existingByOriginalName = () => {
+    const map = new Map();
+    mergedFiles.forEach((f) => {
+      if (f.isFolder || !f.originalFilename || f.originalFilename === f.name) return;
+      map.set(f.originalFilename.toLowerCase(), f);
+    });
+    return map;
+  };
+
+  const startUpload = (files, replaceFileIds) => {
+    // Last batch's finished rows go now rather than on completion, so the
+    // "12 uploaded" summary is still on screen until the next drop.
+    clearFinished(currentFolder);
+    enqueue({
+      dressId: dress.id,
+      folderId: currentFolder,
+      folderLabel: version?.name || trail[trail.length - 1]?.name || dress.dress,
+      files,
+      replaceFileIds,
+    });
+  };
+
+  const onFiles = (files) => {
+    const existingNames = existingByOriginalName();
+    const duplicates = [];
+    const fresh = [];
+    files.forEach((file) => {
+      const existing = existingNames.get(String(file.name).toLowerCase());
+      if (existing) duplicates.push({ name: file.name, file, existing });
+      else fresh.push(file);
+    });
+    if (!duplicates.length) {
+      startUpload(files);
+      return;
     }
-    setUpload({ active: false, progress: 0 });
-    // One toast at the end reflecting what actually happened, not what was
-    // attempted — this used to announce "Uploaded N files" unconditionally
-    // even when every single one had thrown, which is exactly how a real
-    // upload failure looked identical to success from here.
-    const ok = files.length - failed;
-    if (!ok) {
-      if (!accessIssue) showToast?.(lastError || "Upload failed", "error");
-    } else if (failed) {
-      showToast?.(`Uploaded ${ok} of ${files.length} - ${failed} failed: ${lastError}`, "error");
-    } else {
-      showToast?.(`Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`, "ok");
+    setPendingDrop({ duplicates, fresh });
+  };
+
+  const resolveDrop = (choice) => {
+    const drop = pendingDrop;
+    setPendingDrop(null);
+    if (!drop || choice === "cancel") return;
+    if (choice === "skip") {
+      if (drop.fresh.length) startUpload(drop.fresh);
+      else showToast?.("Nothing new to upload", "ok");
+      return;
     }
-    load(currentFolder);
+    const replaceFileIds = {};
+    drop.duplicates.forEach((d) => {
+      replaceFileIds[d.name] = d.existing.id;
+    });
+    startUpload([...drop.fresh, ...drop.duplicates.map((d) => d.file)], replaceFileIds);
   };
 
   const setReviewLocal = (fileId, review) =>
@@ -372,12 +481,54 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
   );
   const commentedCount = Object.values(state.comments).filter((c) => c.length).length;
 
+  // ---- uploads landing in this folder, right now ----
+  //
+  // Each finished upload is folded into the listing the moment it lands
+  // instead of waiting for the whole batch and then refetching: a drop of
+  // thirty photos used to show a progress bar and an unchanged empty grid
+  // for minutes, which reads as nothing happening at all. A file that is
+  // replacing an existing one carries the same Drive id, so it overwrites
+  // that entry rather than appearing twice.
+  const folderUploads = itemsFor(currentFolder);
+  const inFlight = folderUploads.filter((u) => u.status !== "done" && u.status !== "cancelled");
+  const doneUploads = folderUploads.filter((u) => u.status === "done" && u.result);
+  // Drive needs a moment to generate a thumbnail for brand new content, so
+  // until the next listing the tile shows the bytes this browser still has.
+  const previewById = new Map(doneUploads.map((u) => [u.result.id, u.previewUrl]));
+
+  const mergedFiles = (() => {
+    if (!doneUploads.length) return state.files;
+    const byId = new Map(state.files.map((f) => [f.id, f]));
+    doneUploads.forEach((u) => byId.set(u.result.id, { ...(byId.get(u.result.id) || {}), ...u.result }));
+    return Array.from(byId.values());
+  })();
+
+  // One reconciling refetch once the folder goes quiet, for the things a
+  // locally merged file cannot know: its review row, and where Drive's own
+  // ordering actually puts it.
+  const activeUploadCount = folderUploads.filter(
+    (u) => u.status === "queued" || u.status === "uploading"
+  ).length;
+  const wasUploading = useRef(0);
+  useEffect(() => {
+    if (wasUploading.current > 0 && activeUploadCount === 0) load(currentFolder);
+    wasUploading.current = activeUploadCount;
+  }, [activeUploadCount, currentFolder, load]);
+
+  // An expired Drive sign-in is the one upload failure that needs its own
+  // dialog rather than an error tile: nothing else here will work until it
+  // is dealt with, and the fix is one tap away. Read straight off the queue
+  // rather than copied into state by an effect - the queue already holds it,
+  // and all this screen has to remember is whether it was waved away.
+  const accessError = folderUploads.find((u) => u.code === "DRIVE_ACCESS_REQUIRED")?.error || "";
+  const driveAccessIssue = dismissedAccessError === accessError ? "" : accessError;
+
   const matchesFilter = (f) => {
     if (!statusFilter) return true;
     if (statusFilter === "commented") return (state.comments[f.id] || []).length > 0;
     return (state.reviews[f.id]?.status || "pending") === statusFilter;
   };
-  const visibleFiles = state.files.filter((f) => {
+  const visibleFiles = mergedFiles.filter((f) => {
     // A version folder is a tab, not a file. Leaving it in the grid meant a
     // dress showed a mystery folder tile next to its images.
     if (f.isFolder && !version && dressVersionNumber(f.name) != null) return false;
@@ -406,8 +557,8 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               {trail.length ? <span className="text-muted-foreground"> / {trail.map((t) => t.name).join(" / ")}</span> : null}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {dress.collection} · {state.files.filter((f) => !f.isFolder).length} file
-              {state.files.filter((f) => !f.isFolder).length === 1 ? "" : "s"}
+              {dress.collection} · {mergedFiles.filter((f) => !f.isFolder).length} file
+              {mergedFiles.filter((f) => !f.isFolder).length === 1 ? "" : "s"}
               {counts.approved ? ` · ${counts.approved} approved` : ""}
               {commentedCount ? ` · ${commentedCount} commented` : ""}
               {counts.rejected ? ` · ${counts.rejected} rejected` : ""}
@@ -532,9 +683,11 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
       {canWrite ? (
         <>
           <Dropzone
-            disabled={upload.active}
-            uploading={upload.active}
-            progress={upload.progress}
+            // Never disabled while uploading any more. The queue takes
+            // whatever is dropped on it and works through it in order, so
+            // there is no reason to make someone wait for one batch to
+            // finish before adding the next.
+            uploadingCount={activeUploadCount}
             onFiles={onFiles}
             hint={
               trail.length
@@ -620,17 +773,25 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         <div className="py-10 grid place-items-center text-muted-foreground">
           <Loader2 className="size-5 animate-spin" />
         </div>
-      ) : !visibleFiles.length && !state.error ? (
+      ) : !visibleFiles.length && !inFlight.length && !state.error ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          {state.files.length ? "No files match that filter." : "Nothing in this folder yet."}
+          {mergedFiles.length ? "No files match that filter." : "Nothing in this folder yet."}
         </p>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3 mt-4">
+          {/* Queued and in-progress files get a tile of their own, drawn from
+              the picture on this machine. Waiting for Drive to confirm each
+              one before anything appeared is what made a big drop look like
+              nothing was happening. */}
+          {inFlight.map((u) => (
+            <PendingTile key={u.id} item={u} />
+          ))}
           {visibleFiles.map((f) => (
             <FileTile
               key={f.id}
               file={f}
               dressId={dress.id}
+              previewSrc={previewById.get(f.id)}
               review={state.reviews[f.id]}
               comments={state.comments[f.id]}
               canWrite={canWrite}
@@ -687,13 +848,21 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         onConfirm={doTrash}
         onCancel={() => setConfirmTrash(null)}
       />
+      <DuplicateDialog
+        open={Boolean(pendingDrop)}
+        duplicates={pendingDrop?.duplicates || []}
+        freshCount={pendingDrop?.fresh.length || 0}
+        onReplace={() => resolveDrop("replace")}
+        onSkip={() => resolveDrop("skip")}
+        onCancel={() => resolveDrop("cancel")}
+      />
       <ConfirmDialog
         open={Boolean(driveAccessIssue)}
         title="Your Drive sign-in expired"
         description={driveAccessIssue}
         confirmLabel="Sign out now"
         onConfirm={() => signOut()}
-        onCancel={() => setDriveAccessIssue("")}
+        onCancel={() => setDismissedAccessError(accessError)}
       />
       {lightboxIndex != null ? (
         <Lightbox

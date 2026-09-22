@@ -10,7 +10,7 @@ import { UploadCloud } from "lucide-react";
  * makes the highlight flicker if you track them as booleans. Counting enters
  * against leaves is what keeps it steady.
  */
-export function Dropzone({ disabled, onFiles, uploading, progress, hint }) {
+export function Dropzone({ disabled, onFiles, uploadingCount = 0, hint }) {
   const [over, setOver] = useState(false);
   const depth = useRef(0);
   const inputRef = useRef(null);
@@ -60,34 +60,28 @@ export function Dropzone({ disabled, onFiles, uploading, progress, hint }) {
         }}
       />
       <UploadCloud className="size-6 mx-auto mb-2 text-muted-foreground" />
-      {uploading ? (
-        <>
-          <p className="text-sm font-bold text-foreground">Uploading…</p>
-          <div className="mt-2 mx-auto max-w-[240px] rounded-full bg-muted overflow-hidden" style={{ height: 6 }}>
-            <div
-              className="h-full rounded-full transition-[width] duration-200"
-              style={{ width: `${Math.round((progress || 0) * 100)}%`, background: "var(--primary)" }}
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-sm font-bold text-foreground">
-            Drop files here, or{" "}
-            <button
-              type="button"
-              disabled={disabled}
-              onClick={() => inputRef.current?.click()}
-              className="text-primary underline underline-offset-2 disabled:no-underline"
-            >
-              browse
-            </button>
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {hint || "They go straight into this dress's Drive folder."}
-          </p>
-        </>
-      )}
+      {/* Stays a working drop target while an upload is running. The progress
+          itself is no longer shown here at all: each picture now carries its
+          own progress on its own tile in the grid below, and the app-wide
+          pill (see UploadStatusBar) covers the case where someone has walked
+          away from this screen entirely. A bar here as well would be the
+          same information a third time. */}
+      <p className="text-sm font-bold text-foreground">
+        Drop files here, or{" "}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => inputRef.current?.click()}
+          className="text-primary underline underline-offset-2 disabled:no-underline"
+        >
+          browse
+        </button>
+      </p>
+      <p className="text-xs text-muted-foreground mt-1">
+        {uploadingCount
+          ? `${uploadingCount} still uploading - you can keep dropping, they queue up.`
+          : hint || "They go straight into this dress's Drive folder."}
+      </p>
     </div>
   );
 }
