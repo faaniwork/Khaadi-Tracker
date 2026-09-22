@@ -111,6 +111,36 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide, liveFi
 }
 
 /**
+ * A collection's own cover: one tile per dress inside it, each showing that
+ * dress's own cover photo - or CoverThumb's own empty-state icon where
+ * nothing has been shot yet. Six dresses, three shot, reads as three
+ * pictures and three blanks at a glance; no title, no count, no text at
+ * all, because the mosaic already says everything a caption would have.
+ *
+ * Replaces borrowing the FIRST dress's photo to stand in for the whole
+ * collection - a single cover could never show that a collection was half
+ * empty, only ever that it wasn't.
+ */
+function CollectionMosaicTile({ dressRows, onClick }) {
+  const n = dressRows.length;
+  // Roughly square: 4 dresses is 2x2, 9 is 3x3. Clamped so two dresses
+  // don't stretch into two huge tiles and twenty don't shrink to dust.
+  const cols = Math.min(4, Math.max(2, Math.ceil(Math.sqrt(n))));
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative overflow-hidden rounded-[14px] border border-border card-hover aspect-[4/3] grid gap-0.5 bg-border"
+      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+    >
+      {dressRows.map((r) => (
+        <CoverThumb key={r.id} dressId={r.id} className="size-full object-cover object-top" />
+      ))}
+    </button>
+  );
+}
+
+/**
  * The client-facing side of the board: batches → collections → dresses →
  * images, with nothing else on it. No credits, no revisions, no status
  * dropdowns, no Drive links — those are dashboard concerns for the team.
@@ -301,20 +331,9 @@ export function OutputView({
         </div>
       ) : release ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
-          {Object.keys(collections).map((col) => {
-            const colRows = collections[col];
-            const delivered = colRows.filter((r) => r.status === "Delivered").length;
-            return (
-              <CoverTile
-                key={col}
-                wide
-                coverDressId={colRows[0]?.id}
-                title={col}
-                subtitle={`${colRows.length} dress${colRows.length === 1 ? "" : "es"} · ${delivered} delivered`}
-                onClick={() => setCollection(col)}
-              />
-            );
-          })}
+          {Object.keys(collections).map((col) => (
+            <CollectionMosaicTile key={col} dressRows={collections[col]} onClick={() => setCollection(col)} />
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
