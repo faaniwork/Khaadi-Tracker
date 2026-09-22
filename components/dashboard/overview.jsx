@@ -193,7 +193,10 @@ export function MilestoneBar({ rows, mascot, onMascotClick }) {
   // the side of the page.
   const ridePct = Math.max(6, Math.min(94, goalPct));
   return (
-    <div style={{ overflow: "visible" }}>
+    // mb-5 lives here rather than on whatever wraps this, so it's present
+    // whenever the bar itself is - previously borrowed from a shared grid
+    // wrapper that assumed a chart would always be sitting right beside it.
+    <div className="mb-5" style={{ overflow: "visible" }}>
       <div className="flex items-baseline justify-between mb-2.5">
         <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
           Road to 1,000
@@ -239,7 +242,11 @@ export function MilestoneBar({ rows, mascot, onMascotClick }) {
 export function OverviewChart({ releases, rowsFor }) {
   if (!releases.length) return null;
   return (
-    <div className="hidden lg:block">
+    // Now its own full-width row below the milestone bar rather than
+    // sitting beside it - margin lives here, conditional on the same
+    // early return above, so an empty return never leaves a blank gap
+    // where a chart didn't render.
+    <div className="hidden lg:block mb-5">
       <h2 className="f-heading text-sm font-semibold text-foreground mb-3">Delivered % by batch</h2>
       <div className="flex flex-col gap-2">
         {releases.map((rel) => {

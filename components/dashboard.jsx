@@ -1018,18 +1018,18 @@ export function Dashboard({ user }) {
               {loaded ? (
                 <>
                   <OverviewStats rows={rows} totalCost={totalCost(costs)} showCost={canEdit} />
-                  {/* Side by side from lg up rather than stacked: the two of
-                      them plus the stat strip used to cost over 400px before
-                      the first batch card, which on a laptop left the actual
-                      work below the fold. Sharing a row costs the height of
-                      the taller one instead of both, and stops five thin
-                      bars from spanning the full 1,440px to show five
-                      numbers. Still stacked on a phone, where there is only
-                      ever one column to give them. */}
-                  <div className="grid lg:grid-cols-2 gap-x-10 gap-y-6 mb-5">
-                    <MilestoneBar rows={rows} mascot={mascotState} onMascotClick={onMascotClick} />
-                    <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
-                  </div>
+                  {/* Full width, always. The bar's own fill is a literal
+                      percentage of however wide its track is drawn - half a
+                      row at 3.8% renders as a barely-there sliver, which is
+                      what made this read as cut off rather than as "early
+                      days." Sharing a row with the chart used to buy back
+                      some of the vertical space this costs; the milestone
+                      being legible is worth more than that space, so the
+                      chart moves below it instead of beside it - still its
+                      own full-width row, still desktop-only, still gone
+                      entirely on a phone. */}
+                  <MilestoneBar rows={rows} mascot={mascotState} onMascotClick={onMascotClick} />
+                  <OverviewChart releases={releases} rowsFor={(rel) => rowsFor(rows, rel)} />
                 </>
               ) : (
                 <OverviewStatsSkeleton />
