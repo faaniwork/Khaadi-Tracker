@@ -159,7 +159,12 @@ export function FileTile({
         borderWidth: selected || statusStyle ? 2 : 1,
       }}
     >
-      <div className="relative aspect-square bg-secondary/60 flex items-center justify-center overflow-hidden">
+      {/* 2:3, not square: these are shot vertical-portrait at 2:3, so a
+          square crop was cutting real frame off the top and bottom of
+          every photo in the grid - exactly the part a client reviewing a
+          garment needs to see. object-cover now has nothing to crop since
+          the frame already matches the photo's own ratio. */}
+      <div className="relative aspect-[2/3] bg-secondary/60 flex items-center justify-center overflow-hidden">
         {file.isImage && !imgFailed ? (
           <button
             type="button"

@@ -16,6 +16,7 @@ import {
   CheckSquare,
   X as XIcon,
   Check,
+  Images,
 } from "lucide-react";
 import {
   driveList,
@@ -70,7 +71,10 @@ function PendingTile({ item }) {
       className="rounded-2xl border bg-card overflow-hidden flex flex-col relative"
       style={{ borderColor: failed ? "var(--destructive)" : "var(--border)" }}
     >
-      <div className="relative aspect-square bg-secondary/60 grid place-items-center overflow-hidden">
+      {/* Matches the real tile's 2:3 frame (see file-tile.jsx) so a photo
+          doesn't visibly resize the instant it finishes uploading and
+          swaps from this preview to the real one. */}
+      <div className="relative aspect-[2/3] bg-secondary/60 grid place-items-center overflow-hidden">
         {item.previewUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -689,6 +693,25 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
           <DownloadMenu dresses={[dress]} showToast={showToast} />
+          {/* One tap into the same swipeable full-screen viewer every tile
+              already opens on click - like tapping straight into a photo's
+              own single view in Photos rather than having to find one tile
+              in the grid first. Available to anyone who can see files at
+              all, review permission or not - it's a way to look, not to
+              act. */}
+          {visibleFiles.some((f) => !f.isFolder && f.isImage) ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const images = visibleFiles.filter((x) => !x.isFolder && x.isImage);
+                if (images.length) setLightboxIndex(0);
+              }}
+              title="Browse full-screen, swipe or use the arrow keys to move between photos"
+            >
+              <Images className="size-3.5" /> <span className="hidden sm:inline">Browse</span>
+            </Button>
+          ) : null}
           {(reviewAllowed || canWrite) && visibleFiles.some((f) => !f.isFolder) ? (
             <Button
               variant={isSelecting ? "primary" : "ghost"}
@@ -924,7 +947,7 @@ export function DressFiles({ dress, canWrite, canReview, onClose, showToast }) {
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
                 {bin.map((f) => (
                   <div key={f.id} className="rounded-[10px] border border-border bg-card overflow-hidden">
-                    <div className="aspect-[4/5] bg-secondary grid place-items-center overflow-hidden">
+                    <div className="aspect-[2/3] bg-secondary grid place-items-center overflow-hidden">
                       {f.isImage ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

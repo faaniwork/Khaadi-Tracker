@@ -26,7 +26,13 @@ const COMMENTED_LABEL = { label: "Comments", color: "var(--warn)", fg: "var(--wa
  * switching images remounts this fresh and the loaded-state resets on its
  * own — no effect needed to watch the index and reset anything.
  */
-function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom }) {
+// How far a touch has to travel horizontally before it counts as "next
+// photo" rather than "tap" or "the start of a pinch" - big enough that an
+// unsteady finger lifting off doesn't accidentally flip the image, small
+// enough that a real swipe doesn't need to cross half the screen.
+const SWIPE_THRESHOLD = 60;
+
+function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom, onSwipe }) {
   const [loaded, setLoaded] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const frameRef = useRef(null);
@@ -108,8 +114,11 @@ function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom }) {
   }, [onZoomBy]);
 
   const onPointerDown = (e) => {
-    if (!zoomed) return;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, fromX: pan.x, fromY: pan.y, moved: false };
+    // Unzoomed, this is the start of a possible swipe-to-next rather than a
+    // pan - there's nothing to pan at 1x. Same drag tracking either way, so
+    // one pointerup handler below can tell the two apart by whether zoomed
+    // was true when the gesture started.
+    dragRef.current = { startX: e.clientX, startY: e.clientY, fromX: pan.x, fromY: pan.y, moved: false, zoomed };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = (e) => {
@@ -118,7 +127,10 @@ function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom }) {
     const dx = e.clientX - d.startX;
     const dy = e.clientY - d.startY;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) d.moved = true;
-    setPan({ x: d.fromX + dx, y: d.fromY + dy });
+    // Only actually pans the image while zoomed - unzoomed, the finger just
+    // follows along with nothing moving until release decides whether it
+    // was a swipe.
+    if (d.zoomed) setPan({ x: d.fromX + dx, y: d.fromY + dy });
   };
 
   const imgStyle = {
@@ -135,12 +147,26 @@ function LightboxImage({ file, dressId, scale, onZoomBy, onToggleZoom }) {
       }`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
-      onPointerUp={() => {
-        // A drag that panned the image must not also count as the click that
-        // toggles zoom, or panning would zoom straight back out.
-        const moved = dragRef.current?.moved;
+      onPointerUp={(e) => {
+        const d = dragRef.current;
         dragRef.current = null;
-        if (!moved) onToggleZoom();
+        if (!d) return;
+        if (!d.zoomed) {
+          // A real horizontal swipe, like turning a page in Photos - a
+          // mostly-vertical drag (someone trying to scroll, or a slightly
+          // wobbly tap) is deliberately not one, so onSwipe only ever fires
+          // for a clear left/right gesture.
+          const dx = e.clientX - d.startX;
+          const dy = e.clientY - d.startY;
+          if (Math.abs(dx) >= SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy)) {
+            onSwipe(dx < 0 ? "next" : "prev");
+            return;
+          }
+        }
+        // A drag that panned or swiped must not also count as the click
+        // that toggles zoom, or panning would zoom straight back out and a
+        // swipe would zoom in on the photo it just left.
+        if (!d.moved) onToggleZoom();
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -338,6 +364,11 @@ export function Lightbox({
           scale={scale}
           onZoomBy={onZoomBy}
           onToggleZoom={() => setScale((s) => (s > 1 ? 1 : CLICK_ZOOM))}
+          onSwipe={(dir) =>
+            onIndexChange((i) =>
+              dir === "next" ? Math.min(images.length - 1, i + 1) : Math.max(0, i - 1)
+            )
+          }
         />
       </div>
 
