@@ -159,7 +159,7 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide, liveFi
  * collection - a single cover could never show that a collection was half
  * empty, only ever that it wasn't.
  */
-function CollectionMosaicTile({ dressRows, onClick, reviewCounts }) {
+function CollectionMosaicTile({ name, dressRows, onClick, reviewCounts }) {
   const n = dressRows.length;
   // Roughly square: 4 dresses is 2x2, 9 is 3x3. Clamped so two dresses
   // don't stretch into two huge tiles and twenty don't shrink to dust.
@@ -171,6 +171,19 @@ function CollectionMosaicTile({ dressRows, onClick, reviewCounts }) {
       className="group relative overflow-hidden rounded-[14px] border border-border card-hover aspect-[4/3] grid gap-0.5 bg-border"
       style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: "1fr" }}
     >
+      {/* The mosaic itself still carries no per-dress text - that reads
+          fine on its own - but without ANY label, six of these side by
+          side gave no way to tell which one was which before clicking in.
+          One name for the whole tile, not one per dress, sitting on its
+          own gradient above the grid rather than inside any cell. */}
+      <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/80 via-black/20 to-transparent px-3 pt-6 pb-2.5 pointer-events-none">
+        <p
+          className="font-bold text-white text-sm leading-snug truncate"
+          style={{ textShadow: "0 1px 3px rgba(0,0,0,.5)" }}
+        >
+          {name}
+        </p>
+      </div>
       {dressRows.map((r) => (
         // Each cell is `relative` and the image inside it `absolute inset-0`
         // - not a normal-flow grid item. A normal-flow <img> here has no
@@ -414,6 +427,7 @@ export function OutputView({
           {Object.keys(collections).map((col) => (
             <CollectionMosaicTile
               key={col}
+              name={col}
               dressRows={collections[col]}
               reviewCounts={reviewCounts}
               onClick={() => setCollection(col)}
