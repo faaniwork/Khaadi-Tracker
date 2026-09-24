@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, ImageOff } from "lucide-react";
 import { sortReleasesByRecency, STATUS_OPTIONS } from "@/lib/constants";
 import { Select } from "@/components/ui/input";
-import { driveList, driveThumbUrl } from "@/lib/api";
+import { driveList, driveThumbUrl, fetchReviewCounts } from "@/lib/api";
 import { DressFiles } from "./files";
 import { DownloadMenu } from "@/components/files/download-menu";
 
@@ -70,7 +70,44 @@ function CoverThumb({ dressId, className, onFileCount }) {
  * collection, dress) rather than an icon-in-a-box list row — the picture
  * carries the content, the chrome stays out of the way.
  */
-function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide, liveFileCount }) {
+/**
+ * Top-right corner readout of how a dress's own images have been reviewed:
+ * green for how many are approved, yellow (this app's existing colour for
+ * "has feedback" - see COMMENTED_STYLE in file-tile.jsx) for how many have
+ * a comment thread. Both numbers are the dress's TOTAL across every
+ * revision round - the count itself doesn't know versions exist, since
+ * file_reviews and file_comments are keyed by dress_id alone regardless of
+ * which round a file sits in (see getReviewCountsForDresses). Renders
+ * nothing at all when both are zero, so a dress nobody has looked at yet
+ * doesn't grow a "0 · 0" badge on every tile in the grid.
+ */
+function ReviewCountBadge({ counts }) {
+  if (!counts || (!counts.approved && !counts.feedback)) return null;
+  return (
+    <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+      {counts.approved ? (
+        <span
+          className="f-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm leading-none"
+          style={{ background: "var(--good)", color: "var(--good-foreground)" }}
+          title={`${counts.approved} approved`}
+        >
+          {counts.approved}
+        </span>
+      ) : null}
+      {counts.feedback ? (
+        <span
+          className="f-mono text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm leading-none"
+          style={{ background: "var(--warn)", color: "var(--warn-foreground)" }}
+          title={`${counts.feedback} with feedback`}
+        >
+          {counts.feedback}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide, liveFileCount, reviewCounts }) {
   // Starts as whatever the caller passed (the board's own cached count, so
   // there is something to show immediately) and is replaced the moment the
   // cover photo's own fetch reports the real number - see the onFileCount
@@ -100,6 +137,7 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide, liveFi
           {badge}
         </span>
       ) : null}
+      <ReviewCountBadge counts={reviewCounts} />
       <div className="absolute inset-x-0 bottom-0 p-4">
         <p className="font-bold text-white text-base leading-snug truncate" style={{ textShadow: "0 1px 3px rgba(0,0,0,.5)" }}>
           {title}
@@ -121,7 +159,7 @@ function CoverTile({ coverDressId, title, subtitle, badge, onClick, wide, liveFi
  * collection - a single cover could never show that a collection was half
  * empty, only ever that it wasn't.
  */
-function CollectionMosaicTile({ dressRows, onClick }) {
+function CollectionMosaicTile({ dressRows, onClick, reviewCounts }) {
   const n = dressRows.length;
   // Roughly square: 4 dresses is 2x2, 9 is 3x3. Clamped so two dresses
   // don't stretch into two huge tiles and twenty don't shrink to dust.
@@ -149,6 +187,7 @@ function CollectionMosaicTile({ dressRows, onClick }) {
         // uses for the same reason.
         <div key={r.id} className="relative">
           <CoverThumb dressId={r.id} className="absolute inset-0 size-full object-cover object-top" />
+          <ReviewCountBadge counts={reviewCounts?.[r.id]} />
         </div>
       ))}
     </button>
@@ -225,6 +264,31 @@ export function OutputView({
     return map;
   }, [releaseRows]);
   const collectionRows = collection ? collections[collection] || [] : [];
+
+  // Fetched once per release for every dress in it - covers both screens
+  // that show a per-dress badge (the collection mosaics and the dress cards
+  // one level in), since collectionRows is always a subset of releaseRows.
+  // Re-fires whenever the actual set of dress ids changes, not on every
+  // render - releaseRows is a fresh array each render even when its
+  // contents haven't, so the dependency is the ids themselves, joined into
+  // one string, rather than the array.
+  const [reviewCounts, setReviewCounts] = useState({});
+  const releaseDressIds = releaseRows.map((r) => r.id).join(',');
+  useEffect(() => {
+    if (!releaseDressIds) return;
+    let ignore = false;
+    fetchReviewCounts({ dressIds: releaseDressIds.split(',') })
+      .then((data) => {
+        if (!ignore) setReviewCounts(data.counts || {});
+      })
+      .catch(() => {
+        // A missing badge is a fine failure mode - the tile itself, and
+        // everything it actually does, works the same either way.
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [releaseDressIds]);
 
   const crumb = (label, onClick) => (
     <button
@@ -337,6 +401,7 @@ export function OutputView({
               subtitle={`${r.files != null ? r.files : "-"} files`}
               liveFileCount
               badge={r.status === "Delivered" ? "Delivered" : null}
+              reviewCounts={reviewCounts[r.id]}
               onClick={() => setDress(r)}
             />
           ))}
@@ -347,7 +412,12 @@ export function OutputView({
       ) : release ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger">
           {Object.keys(collections).map((col) => (
-            <CollectionMosaicTile key={col} dressRows={collections[col]} onClick={() => setCollection(col)} />
+            <CollectionMosaicTile
+              key={col}
+              dressRows={collections[col]}
+              reviewCounts={reviewCounts}
+              onClick={() => setCollection(col)}
+            />
           ))}
         </div>
       ) : (
