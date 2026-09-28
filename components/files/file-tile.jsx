@@ -169,14 +169,6 @@ export function FileTile({
           <button
             type="button"
             onClick={() => (selectable ? onToggleSelect?.(file) : onOpenLightbox?.(file))}
-            // Warms the full-resolution image while the cursor is still on
-            // its way to the click, so opening it is usually instant. Costs
-            // nothing for anyone who never opens it.
-            onMouseEnter={() => {
-              if (selectable) return;
-              const img = new Image();
-              img.src = driveThumbUrl({ fileId: file.id, dressId, size: 1600 });
-            }}
             aria-label={selectable ? `Select ${file.name}` : `View ${file.name} full screen`}
             aria-pressed={selectable ? selected : undefined}
             className="absolute inset-0 size-full group"

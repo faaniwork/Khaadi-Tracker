@@ -39,7 +39,7 @@ function safeSegment(name, fallback) {
 export async function POST(req) {
   try {
     const caller = await resolveCaller(req);
-    const { items, mode } = await req.json();
+    const { items, mode, estimateOnly = false } = await req.json();
 
     if (!Array.isArray(items) || !items.length) {
       return new Response('items is required', { status: 400 });
@@ -55,6 +55,26 @@ export async function POST(req) {
     for (const item of items) {
       const dress = await assertDressInScope(caller, item.dressId);
       dresses.push(dress);
+    }
+
+    // A lightweight preflight lets the browser warn before a multi-GB ZIP
+    // crosses the Function/CDN boundary. It lists metadata, never file bytes.
+    if (estimateOnly) {
+      let estimatedBytes = 0;
+      let fileCount = 0;
+      for (const dress of dresses) {
+        const [files, reviews, comments] = await Promise.all([
+          listDressFiles(dress.id),
+          getReviewsForDress(dress.id),
+          getCommentsForDress(dress.id),
+        ]);
+        for (const file of files) {
+          if (file.isFolder || !matchesMode(file.id, reviews, comments, mode)) continue;
+          estimatedBytes += file.size || 0;
+          fileCount++;
+        }
+      }
+      return Response.json({ estimatedBytes, fileCount });
     }
 
     const archive = archiver('zip', { zlib: { level: 6 } });
