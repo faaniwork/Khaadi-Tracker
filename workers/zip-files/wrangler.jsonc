@@ -1,0 +1,8 @@
+{
+  "name": "khaadi-zip-files",
+  "main": "index.mjs",
+  "compatibility_date": "2026-09-28",
+  "vars": {
+    "APP_ORIGIN": "https://khaadi-production-tracker.vercel.app"
+  }
+}

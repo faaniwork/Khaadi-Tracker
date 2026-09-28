@@ -1,6 +1,5 @@
-import { Readable } from 'node:stream';
-import archiver from 'archiver';
-import { listDressFiles, fetchOriginalBytes } from '@/lib/drive';
+import { createHmac } from 'node:crypto';
+import { listDressFiles } from '@/lib/drive';
 import { getReviewsForDress, getCommentsForDress } from '@/lib/db';
 import { resolveCaller, assertDressInScope, statusForError } from '@/lib/reviewAuth';
 
@@ -13,128 +12,62 @@ function matchesMode(fileId, reviews, comments, mode) {
   return status === 'approved' || (comments?.[fileId] || []).length > 0;
 }
 
-// Zip entry names can't safely carry a path separator from a folder name
-// that happens to contain one, and a blank name would collide with every
-// other blank one.
-function safeSegment(name, fallback) {
-  const clean = String(name || fallback).replace(/[\\/]/g, '-').trim();
-  return clean || fallback;
+function safeSegment(value, fallback) {
+  return String(value || fallback).replace(/[\\/]/g, '-').trim() || fallback;
 }
 
-/**
- * POST /api/drive/download-zip
- *   { items: [{ dressId, dress, collection }], mode: 'all'|'approved'|'approved_or_commented' }
- *
- * One zip, built by streaming straight from Drive into the response as each
- * file arrives — nothing buffers in memory, so this doesn't care whether
- * `items` is one dress or an entire batch. Entries are laid out
- * `<collection>/<dress>/<filename>`, so extracting the zip reproduces the
- * same folder shape the board already groups things into.
- *
- * Each dress is scope-checked with the same assertDressInScope every other
- * file route uses; a client can only ever have been handed dress rows that
- * are already theirs to see, so this adds no new exposure beyond what
- * browsing to that dress already grants.
- */
+// Authorize file IDs without transferring their bytes through Vercel.
 export async function POST(req) {
   try {
     const caller = await resolveCaller(req);
-    const { items, mode, estimateOnly = false } = await req.json();
-
-    if (!Array.isArray(items) || !items.length) {
-      return new Response('items is required', { status: 400 });
+    const { items, mode } = await req.json();
+    if (!Array.isArray(items) || !items.length || items.length > 500) {
+      return new Response('Choose between 1 and 500 dresses', { status: 400 });
     }
-    if (!MODES.includes(mode)) {
-      return new Response('Unknown mode ' + mode, { status: 400 });
-    }
+    if (!MODES.includes(mode)) return new Response('Unknown mode', { status: 400 });
 
-    // Every dress checked before any Drive listing starts, so a request
-    // naming one dress outside the caller's scope fails outright rather
-    // than silently zipping everyone else's.
+    const workerUrl = process.env.ZIP_FILE_WORKER_URL;
+    const secret = process.env.ZIP_FILE_SIGNING_SECRET;
+    if (!workerUrl || !secret) return new Response('ZIP downloads are not configured yet', { status: 503 });
+    const baseUrl = new URL(workerUrl);
+    if (baseUrl.protocol !== 'https:') throw new Error('ZIP_FILE_WORKER_URL must use HTTPS');
+
     const dresses = [];
-    for (const item of items) {
-      const dress = await assertDressInScope(caller, item.dressId);
-      dresses.push(dress);
-    }
+    for (const item of items) dresses.push(await assertDressInScope(caller, item.dressId));
 
-    // A lightweight preflight lets the browser warn before a multi-GB ZIP
-    // crosses the Function/CDN boundary. It lists metadata, never file bytes.
-    if (estimateOnly) {
-      let estimatedBytes = 0;
-      let fileCount = 0;
-      for (const dress of dresses) {
-        const [files, reviews, comments] = await Promise.all([
-          listDressFiles(dress.id),
-          getReviewsForDress(dress.id),
-          getCommentsForDress(dress.id),
-        ]);
-        for (const file of files) {
-          if (file.isFolder || !matchesMode(file.id, reviews, comments, mode)) continue;
-          estimatedBytes += file.size || 0;
-          fileCount++;
+    const expires = Math.floor(Date.now() / 1000) + 60 * 60;
+    const files = [];
+    for (const dress of dresses) {
+      const [listed, reviews, comments] = await Promise.all([
+        listDressFiles(dress.id), getReviewsForDress(dress.id), getCommentsForDress(dress.id),
+      ]);
+      const used = new Set();
+      for (const file of listed) {
+        if (file.isFolder || !matchesMode(file.id, reviews, comments, mode)) continue;
+        let name = safeSegment(file.name, file.id);
+        if (used.has(name)) {
+          const dot = name.lastIndexOf('.');
+          name = dot > 0 ? `${name.slice(0, dot)} (${file.id.slice(0, 6)})${name.slice(dot)}` : `${name} (${file.id.slice(0, 6)})`;
         }
+        used.add(name);
+        const signature = createHmac('sha256', secret).update(`${file.id}.${expires}`).digest('hex');
+        const url = new URL('/file', baseUrl);
+        url.searchParams.set('id', file.id);
+        url.searchParams.set('exp', String(expires));
+        url.searchParams.set('sig', signature);
+        files.push({
+          name: `${safeSegment(dress.collection, 'Collection')}/${safeSegment(dress.dress, dress.id)}/${name}`,
+          url: url.toString(),
+        });
       }
-      return Response.json({ estimatedBytes, fileCount });
     }
-
-    const archive = archiver('zip', { zlib: { level: 6 } });
-    archive.on('warning', (e) => console.error('zip warning', e));
-    archive.on('error', (e) => console.error('zip error', e));
-
-    // Fire-and-stream: this runs concurrently with the response being read,
-    // rather than being awaited before responding, which is what makes a
-    // large batch stream out instead of buffering.
-    (async () => {
-      try {
-        for (const dress of dresses) {
-          const [files, reviews, comments] = await Promise.all([
-            listDressFiles(dress.id),
-            getReviewsForDress(dress.id),
-            getCommentsForDress(dress.id),
-          ]);
-          const collectionName = safeSegment(dress.collection, 'Collection');
-          const dressName = safeSegment(dress.dress, dress.id);
-          const seenNames = new Set();
-
-          for (const file of files) {
-            if (file.isFolder) continue;
-            if (!matchesMode(file.id, reviews, comments, mode)) continue;
-
-            let entryName = safeSegment(file.name, file.id);
-            if (seenNames.has(entryName)) {
-              const dot = entryName.lastIndexOf('.');
-              entryName = dot > 0
-                ? `${entryName.slice(0, dot)} (${file.id.slice(0, 6)})${entryName.slice(dot)}`
-                : `${entryName} (${file.id.slice(0, 6)})`;
-            }
-            seenNames.add(entryName);
-
-            try {
-              const { body } = await fetchOriginalBytes(file.id);
-              const nodeStream = typeof body?.pipe === 'function' ? body : Readable.from(body);
-              archive.append(nodeStream, { name: `${collectionName}/${dressName}/${entryName}` });
-            } catch (e) {
-              console.error(`zip: skipping ${dressName}/${entryName}`, e);
-            }
-          }
-        }
-      } finally {
-        archive.finalize();
-      }
-    })();
-
-    const webStream = Readable.toWeb(archive);
-    const zipName = dresses.length === 1 ? safeSegment(dresses[0].dress, 'download') : 'khaadi-download';
-
-    return new Response(webStream, {
-      headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename="${zipName}.zip"`,
-      },
-    });
+    return Response.json({
+      files,
+      filename: `${dresses.length === 1 ? safeSegment(dresses[0].dress, 'download') : 'khaadi-download'}.zip`,
+    }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     const status = statusForError(e);
-    if (status >= 500) console.error('drive download-zip failed', e);
-    return new Response(e.message || 'Could not build that download', { status });
+    if (status >= 500) console.error('drive download manifest failed', e);
+    return new Response(e.message || 'Could not prepare download', { status });
   }
 }
