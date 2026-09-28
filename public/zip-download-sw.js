@@ -1,5 +1,7 @@
-// This worker handles only /zip-download/* so it cannot intercept app routes.
+// Control the app page, but intercept only /zip-stream/* requests.
 const pending = new Map();
+
+self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener('message', (event) => {
   const { token, filename, stream } = event.data || {};
@@ -13,7 +15,7 @@ self.addEventListener('message', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  const token = url.pathname.match(/^\/zip-download\/([a-f0-9-]{36})$/)?.[1];
+  const token = url.pathname.match(/^\/zip-stream\/([a-f0-9-]{36})$/)?.[1];
   if (!token) return;
   const download = pending.get(token);
   if (!download) return;
