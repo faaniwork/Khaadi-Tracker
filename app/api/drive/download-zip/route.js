@@ -22,7 +22,7 @@ export async function POST(req) {
     const caller = await resolveCaller(req);
     const { items, mode } = await req.json();
     if (!Array.isArray(items) || !items.length || items.length > 500) {
-      return new Response('Choose between 1 and 500 dresses', { status: 400 });
+      return new Response('Choose between 1 and 500 dresses from one collection', { status: 400 });
     }
     if (!MODES.includes(mode)) return new Response('Unknown mode', { status: 400 });
 
@@ -34,9 +34,13 @@ export async function POST(req) {
 
     const dresses = [];
     for (const item of items) dresses.push(await assertDressInScope(caller, item.dressId));
+    if (dresses.some((dress) => dress.release !== dresses[0].release || dress.collection !== dresses[0].collection)) {
+      return new Response('ZIP downloads must stay within one collection', { status: 400 });
+    }
 
     const expires = Math.floor(Date.now() / 1000) + 60 * 60;
     const files = [];
+    let estimatedBytes = 0;
     for (const dress of dresses) {
       const [listed, reviews, comments] = await Promise.all([
         listDressFiles(dress.id), getReviewsForDress(dress.id), getCommentsForDress(dress.id),
@@ -50,6 +54,7 @@ export async function POST(req) {
           name = dot > 0 ? `${name.slice(0, dot)} (${file.id.slice(0, 6)})${name.slice(dot)}` : `${name} (${file.id.slice(0, 6)})`;
         }
         used.add(name);
+        estimatedBytes += Number(file.size) || 0;
         const signature = createHmac('sha256', secret).update(`${file.id}.${expires}`).digest('hex');
         const url = new URL('/file', baseUrl);
         url.searchParams.set('id', file.id);
@@ -63,7 +68,8 @@ export async function POST(req) {
     }
     return Response.json({
       files,
-      filename: `${dresses.length === 1 ? safeSegment(dresses[0].dress, 'download') : 'khaadi-download'}.zip`,
+      estimatedBytes,
+      filename: `${dresses.length === 1 ? safeSegment(dresses[0].dress, 'download') : safeSegment(dresses[0].collection, 'collection')}.zip`,
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) {
     const status = statusForError(e);

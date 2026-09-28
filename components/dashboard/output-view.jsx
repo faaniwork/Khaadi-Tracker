@@ -325,8 +325,8 @@ export function OutputView({
   // ml-auto pull that whole group back onto the trail's line.
   const actions = (
     <div className="flex items-center gap-2 flex-wrap sm:ml-auto">
-      {!dress && release ? (
-        <DownloadMenu dresses={collection ? collectionRows : releaseRows} showToast={showToast} />
+      {!dress && release && collection ? (
+        <DownloadMenu dresses={collectionRows} showToast={showToast} />
       ) : null}
       {release && onOpenBatchTools ? (
         <button
