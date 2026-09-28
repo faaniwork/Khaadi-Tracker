@@ -15,7 +15,7 @@ const OPTIONS = [
  * BulkStatusControl elsewhere in this dashboard — a native select rather
  * than a custom popover, so this needs no click-outside handling of its
  * own. Works the same whether `dresses` is one dress, a whole collection,
- * or a whole batch; the caller decides scope by what it passes in.
+ * or a whole collection; the caller decides scope by what it passes in.
  *
  * The select itself is invisible, not styled: a native select's own closed
  * -state text box ignores text-align on several mobile browsers, which is
@@ -31,7 +31,20 @@ export function DownloadMenu({ dresses, showToast, disabled, className = "" }) {
   const run = async (mode) => {
     setBusy(true);
     try {
-      await downloadForDresses({ dresses, mode, showToast });
+      let fileHandle;
+      if (typeof window.showSaveFilePicker === "function") {
+        try {
+          const label = dresses.length === 1 ? dresses[0].dress : dresses[0].collection;
+          fileHandle = await window.showSaveFilePicker({
+            suggestedName: `${String(label || "khaadi-download").replace(/[\\/]/g, "-")}.zip`,
+            types: [{ description: "ZIP archive", accept: { "application/zip": [".zip"] } }],
+          });
+        } catch (error) {
+          if (error.name === "AbortError") return;
+          // Browsers can expose the picker but disable it in this context.
+        }
+      }
+      await downloadForDresses({ dresses, mode, showToast, fileHandle });
     } finally {
       setBusy(false);
     }

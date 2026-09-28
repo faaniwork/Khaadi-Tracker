@@ -239,16 +239,6 @@ export function Lightbox({
   const busy = file ? busyIds?.has(file.id) : false;
   const postingComment = file ? postingCommentIds?.has(file.id) : false;
 
-  // Pure side effect on the browser's own image cache, no state involved:
-  // by the time someone presses "next", the image is often already there.
-  useEffect(() => {
-    [images[index - 1], images[index + 1]].forEach((neighbour) => {
-      if (!neighbour) return;
-      const img = new Image();
-      img.src = driveThumbUrl({ fileId: neighbour.id, dressId, size: LIGHTBOX_SIZE });
-    });
-  }, [index, images, dressId]);
-
   // Belt and braces with the wheel handler above: while this is open the
   // page behind it does not scroll at all, by keyboard or scrollbar either.
   useEffect(() => {
