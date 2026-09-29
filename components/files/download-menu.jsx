@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, X } from "lucide-react";
 import { downloadForDresses } from "@/lib/bulkDownload";
 
 const OPTIONS = [
@@ -27,9 +27,11 @@ const OPTIONS = [
  */
 export function DownloadMenu({ dresses, showToast, disabled, className = "" }) {
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(null);
   const isDisabled = disabled || busy || !dresses?.length;
   const run = async (mode) => {
     setBusy(true);
+    setProgress({ phase: 'preparing', message: 'Preparing download…' });
     try {
       let fileHandle;
       if (typeof window.showSaveFilePicker === "function") {
@@ -44,15 +46,21 @@ export function DownloadMenu({ dresses, showToast, disabled, className = "" }) {
           // Browsers can expose the picker but disable it in this context.
         }
       }
-      await downloadForDresses({ dresses, mode, showToast, fileHandle });
+      await downloadForDresses({ dresses, mode, showToast: setProgress, fileHandle });
     } finally {
       setBusy(false);
+      setProgress((current) => current?.phase === 'complete' || current?.phase === 'error' ? current : null);
     }
   };
 
+  const dismissProgress = () => {
+    if (!busy) setProgress(null);
+  };
+
   return (
-    <div className={`relative inline-flex size-9 shrink-0 ${className}`}>
-      <select
+    <>
+      <div className={`relative inline-flex size-9 shrink-0 ${className}`}>
+        <select
         value=""
         disabled={isDisabled}
         title="Download"
@@ -78,7 +86,35 @@ export function DownloadMenu({ dresses, showToast, disabled, className = "" }) {
         className={`pointer-events-none absolute inset-0 flex items-center justify-center rounded-full border border-border bg-secondary text-foreground transition-colors peer-focus-visible:border-primary ${isDisabled ? "opacity-60" : ""}`}
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+        </div>
       </div>
-    </div>
+      {progress ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] md:bottom-5 md:left-auto md:right-5 md:w-[min(26rem,calc(100vw-2rem))] z-[60] rounded-2xl border border-border bg-card p-4 shadow-xl"
+        >
+          <div className="flex items-start gap-3">
+            {busy ? <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-primary" /> : null}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground">{progress.message}</p>
+              {busy ? (
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-300"
+                    style={{ width: `${progress.progress || 3}%` }}
+                  />
+                </div>
+              ) : null}
+            </div>
+            {!busy ? (
+              <button type="button" onClick={dismissProgress} aria-label="Dismiss download status" className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground">
+                <X className="size-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
