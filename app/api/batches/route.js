@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { createFolder, mapWithConcurrency, trashFile } from '@/lib/drive';
+import { createFolder, mapWithConcurrency, renameFile, trashFile } from '@/lib/drive';
 import { getUserDriveAccessToken } from '@/lib/googleUserToken';
-import { resolveOutputFolderId } from '@/lib/driveSync';
+import { resolveOutputFolderId, resolveRootFolderId } from '@/lib/driveSync';
 import {
   assertReleaseNameFree,
   createReleaseRecord,
   deleteRelease,
   getMyRole,
   getReleaseFolderId,
+  updateReleaseDetails,
 } from '@/lib/db';
 import { looksLikeDressFolder } from '@/lib/constants';
 
@@ -24,6 +25,37 @@ const MAX_DRESSES = 60;
 
 function bad(message, status = 400) {
   return NextResponse.json({ error: message }, { status });
+}
+
+/** Rename a batch and change its delivery date. */
+export async function PATCH(req) {
+  try {
+    const session = await auth();
+    if (!session) return bad('UNAUTHENTICATED', 401);
+    const email = session.user?.email || '';
+    if (!['admin', 'editor'].includes(await getMyRole(email))) return bad('Editor access required', 403);
+    const { release, name, date } = await req.json();
+    const oldName = String(release || '').trim();
+    const nextName = String(name || '').trim();
+    const nextDate = String(date || '').trim();
+    if (!oldName || !nextName || /[\\/]/.test(nextName)) return bad('Enter a batch name without slashes.');
+    if (nextDate && !/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) return bad('Enter a valid date.');
+    const folderId = await resolveRootFolderId(oldName);
+    if (!folderId) return bad('Batch Drive folder not found', 404);
+    if (nextName !== oldName) await renameFile(folderId, nextName);
+    try {
+      const result = await updateReleaseDetails({ email, release: oldName, name: nextName, date: nextDate,
+        folderId, by: session.user?.name || email });
+      return NextResponse.json(result);
+    } catch (error) {
+      if (nextName !== oldName) await renameFile(folderId, oldName).catch(() => {});
+      throw error;
+    }
+  } catch (e) {
+    const status = e.status || (e.code === 'VIEW_ONLY' ? 403 : 500);
+    if (status >= 500) console.error('batch edit failed', e);
+    return bad(e.message || 'Could not edit batch', status);
+  }
 }
 
 /**

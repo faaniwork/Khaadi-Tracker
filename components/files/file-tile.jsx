@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X, MessageCircle, Trash2, Folder, FileText, Loader2, Send, CircleCheck, Circle } from "lucide-react";
+import { Check, X, MessageCircle, Trash2, Folder, FileText, Loader2, Send, CircleCheck, Circle, Download } from "lucide-react";
 import { timeAgo } from "@/lib/constants";
 import { driveThumbUrl } from "@/lib/api";
 import { DriveIcon } from "@/components/ui/drive-icon";
 import { FEEDBACK_REASONS } from "./reject-dialog";
+import { downloadSingleFile } from "@/lib/singleDownload";
 
 const REASON_LABEL = Object.fromEntries(FEEDBACK_REASONS.map((r) => [r.value, r.label]));
 
@@ -126,6 +127,7 @@ export function FileTile({
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const status = review?.status || "pending";
   const commentList = comments || [];
   const hasComments = commentList.length > 0;
@@ -246,6 +248,23 @@ export function FileTile({
         ) : null}
 
         <div className={`mt-auto flex items-center flex-wrap gap-x-2 gap-y-1.5 ${selectable ? "opacity-40 pointer-events-none" : ""}`}>
+          {file.isImage ? (
+            <button
+              type="button"
+              disabled={downloading}
+              onClick={async () => {
+                setDownloading(true);
+                try { await downloadSingleFile({ fileId: file.id, dressId }); }
+                catch (error) { window.alert(error.message || 'Download failed'); }
+                finally { setDownloading(false); }
+              }}
+              title={`Download ${file.name}`}
+              aria-label={`Download ${file.name}`}
+              className="p-1.5 -m-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-50"
+            >
+              {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            </button>
+          ) : null}
           {canReview ? (
             <>
               <button

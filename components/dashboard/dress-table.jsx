@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Coins, Pencil, Check, X, Images, ImageOff } from "lucide-react";
+import { Coins, Pencil, Check, X, Images, ImageOff, Trash2 } from "lucide-react";
 import { DriveIcon } from "@/components/ui/drive-icon";
 import { timeAgo } from "@/lib/constants";
 import { Input } from "@/components/ui/input";
@@ -34,13 +34,29 @@ export function CostInput({ scope, keyName, value, syncState, disabled, onChange
   );
 }
 
-export function DressRow({ row, disabled, syncState, onFieldChange, onRetry, onOpenFiles }) {
+export function DressRow({ row, disabled, syncState, onFieldChange, onRetry, onOpenFiles, onRenameDress }) {
+  const [renaming, setRenaming] = useState(false);
+  const [name, setName] = useState(row.dress);
+  const [savingName, setSavingName] = useState(false);
   const discarded = row.status === "Discarded";
   return (
     <tr className="dress-row border-b border-border last:border-0">
       <td className={`py-3 px-4 text-sm font-semibold text-foreground ${discarded ? "line-through opacity-50" : ""}`}>
         <SyncDot state={syncState} onRetry={onRetry} title="Saved" />
-        {row.dress}
+        {renaming ? (
+          <form className="inline-flex items-center gap-1" onSubmit={async (event) => {
+            event.preventDefault(); setSavingName(true);
+            try { await onRenameDress(row.id, name.trim()); setRenaming(false); }
+            catch (error) { window.alert(error.message); }
+            finally { setSavingName(false); }
+          }}>
+            <input autoFocus value={name} onChange={(event) => setName(event.target.value)} className="w-36 rounded-lg border border-border bg-background px-2 py-1 text-xs" disabled={savingName} />
+            <button type="submit" disabled={savingName} aria-label="Save dress name"><Check className="size-3.5" /></button>
+            <button type="button" onClick={() => setRenaming(false)} aria-label="Cancel"><X className="size-3.5" /></button>
+          </form>
+        ) : (
+          <span>{row.dress}{!disabled ? <button type="button" onClick={() => { setName(row.dress); setRenaming(true); }} title="Rename dress" aria-label={`Rename ${row.dress}`} className="ml-2 text-muted-foreground"><Pencil className="inline size-3" /></button> : null}</span>
+        )}
       </td>
       <td className="py-3 px-4">
         <StatusSelect
@@ -143,16 +159,21 @@ export function CollectionCard({
   onRetry,
   onBulkStatus,
   onRenameCollection,
+  onRenameDress,
+  onDeleteCollection,
+  canDelete,
   onOpenFiles,
 }) {
   const delivered = colRows.filter((r) => r.status === "Delivered").length;
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(col);
   const [saving, setSaving] = useState(false);
+  const [renameError, setRenameError] = useState("");
 
   const startRename = (e) => {
     e.stopPropagation();
     setDraft(col);
+    setRenameError("");
     setRenaming(true);
   };
   const cancelRename = (e) => {
@@ -170,6 +191,8 @@ export function CollectionCard({
     try {
       await onRenameCollection(rel, col, trimmed);
       setRenaming(false);
+    } catch (error) {
+      setRenameError(error.message || "Rename failed");
     } finally {
       setSaving(false);
     }
@@ -216,6 +239,7 @@ export function CollectionCard({
               >
                 <Check className="size-3.5" />
               </button>
+              {renameError ? <span className="text-xs text-destructive">{renameError}</span> : null}
               <button
                 type="button"
                 onClick={cancelRename}
@@ -251,6 +275,15 @@ export function CollectionCard({
             whole point of it. */}
         <CollectionUploadBadge colRows={colRows} />
         <div className="flex items-center gap-2 flex-wrap ml-auto">
+          {canEdit && canDelete ? (
+            <button type="button" onClick={async () => {
+              if (window.confirm(`Remove ${col} from ${rel}? Its Drive folder will be kept in Removed collections.`)) {
+                await onDeleteCollection(rel, col);
+              }
+            }} title="Remove collection" aria-label={`Remove ${col} collection`} className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-secondary">
+              <Trash2 className="size-3.5" />
+            </button>
+          ) : null}
           <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("collection", `${rel}␟${col}`, status, colRows.length)} />
           {/* Drive is where the team manages files, not somewhere a viewer
               or client should ever need to go - same call already made for
@@ -291,6 +324,7 @@ export function CollectionCard({
                   onFieldChange={onFieldChange}
                   onRetry={() => onRetry(r.id)}
                   onOpenFiles={onOpenFiles}
+                  onRenameDress={onRenameDress}
                 />
               ))}
             </tbody>

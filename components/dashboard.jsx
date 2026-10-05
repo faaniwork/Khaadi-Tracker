@@ -13,6 +13,7 @@ import {
   saveReleaseRevisions,
   syncToSheet,
   renameCollection as renameCollectionApi,
+  changeStructure,
   driveResync,
   verifyBatches,
   fetchProfiles,
@@ -637,10 +638,40 @@ export function Dashboard({ user }) {
       } catch (e) {
         console.error("rename collection failed", e);
         showToast(e.message || "Rename failed", "error");
+        throw e;
       }
     },
     [canEdit, showToast, loadData]
   );
+
+  const onEditBatch = useCallback(async (release, name, date) => {
+    const result = await changeStructure('/api/batches', 'PATCH', { release, name, date });
+    showToast('Batch updated');
+    if (result.release !== release) setView({ page: 'batch', batch: result.release });
+    await loadData(true);
+  }, [loadData, showToast]);
+
+  const onAddCollection = useCallback(async (release, name, dresses) => {
+    await changeStructure('/api/collections', 'POST', { release, name, dresses });
+    showToast(`Added ${name}`);
+    await loadData(true);
+  }, [loadData, showToast]);
+
+  const onDeleteCollection = useCallback(async (release, name) => {
+    try {
+      await changeStructure('/api/collections', 'DELETE', { release, name });
+      showToast(`Removed ${name}`);
+      await loadData(true);
+    } catch (error) {
+      showToast(error.message || 'Could not remove collection', 'error');
+    }
+  }, [loadData, showToast]);
+
+  const onRenameDress = useCallback(async (dressId, name) => {
+    await changeStructure('/api/dress/rename', 'POST', { dressId, name });
+    showToast('Dress renamed');
+    await loadData(true);
+  }, [loadData, showToast]);
 
   const onSyncSheet = useCallback(async () => {
     if (sheetSyncing) return;
@@ -1097,6 +1128,7 @@ export function Dashboard({ user }) {
                         <BatchCard
                           key={rel}
                           rel={rel}
+                          releaseDate={releaseFolders[rel]?.date || ""}
                           driveLink={driveLinkFor(rel, releaseFolders)}
                           rr={rr}
                           colCount={Object.keys(cols).length}
@@ -1173,6 +1205,7 @@ export function Dashboard({ user }) {
               // showing, which read as the page simply not changing.
               key={view.batch}
               rel={view.batch}
+              releaseDate={releaseFolders[view.batch]?.date || ""}
               driveLink={driveLinkFor(view.batch, releaseFolders)}
               rows={rowsFor(rows, view.batch)}
               collections={collectionsFor(rows, view.batch)}
@@ -1189,6 +1222,10 @@ export function Dashboard({ user }) {
               onBulkStatus={requestBulkStatus}
               onAddNote={onAddNote}
               onRenameCollection={onRenameCollection}
+              onEditBatch={onEditBatch}
+              onAddCollection={onAddCollection}
+              onDeleteCollection={onDeleteCollection}
+              onRenameDress={onRenameDress}
               driveSync={driveSync[view.batch]}
               onResync={onResync}
               resyncing={resyncing === view.batch}

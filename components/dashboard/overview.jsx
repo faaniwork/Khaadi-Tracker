@@ -340,6 +340,7 @@ function CardNotes({ list, canEdit, onAddNote }) {
 
 export function BatchCard({
   rel,
+  releaseDate,
   driveLink,
   rr,
   colCount,
@@ -414,6 +415,7 @@ export function BatchCard({
             ) : null}
           </div>
           <p className="text-xs mt-1 text-muted-foreground leading-snug">{meta}</p>
+          {releaseDate ? <p className="text-xs mt-1 text-muted-foreground">Delivery date: {releaseDate}</p> : null}
         </div>
       </div>
 

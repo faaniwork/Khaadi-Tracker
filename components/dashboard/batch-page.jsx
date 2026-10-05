@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Ban, RefreshCw } from "lucide-react";
+import { Check, Ban, RefreshCw, Pencil, Plus } from "lucide-react";
 import { RELEASE_LINKS, COLLECTION_LINKS, timeAgo } from "@/lib/constants";
 import { Ring } from "@/components/ui/ring";
 import { DriveIcon } from "@/components/ui/drive-icon";
@@ -12,6 +12,7 @@ import { DressFiles } from "./files";
 
 export function BatchPage({
   rel,
+  releaseDate,
   driveLink,
   rows,
   collections,
@@ -28,22 +29,24 @@ export function BatchPage({
   onBulkStatus,
   onAddNote,
   onRenameCollection,
+  onEditBatch,
+  onAddCollection,
+  onDeleteCollection,
+  onRenameDress,
   driveSync,
   onResync,
   resyncing,
   showToast,
 }) {
   const [openFiles, setOpenFiles] = useState(null);
-  if (!rows.length) {
-    return (
-      <>
-        <div className="rounded-[14px] border border-border bg-card p-8 text-center text-sm mb-5 text-muted-foreground">
-          Nothing in this batch yet.
-        </div>
-        <NotesCard rel={rel} list={notesForBatch} canEdit={canEdit} onAddNote={onAddNote} />
-      </>
-    );
-  }
+  const [editingBatch, setEditingBatch] = useState(false);
+  const [addingCollection, setAddingCollection] = useState(false);
+  const [batchName, setBatchName] = useState(rel);
+  const [batchDate, setBatchDate] = useState(releaseDate || "");
+  const [collectionName, setCollectionName] = useState("");
+  const [dressCount, setDressCount] = useState(6);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
   const delivered = rows.filter((r) => r.status === "Delivered").length;
   const discarded = rows.filter((r) => r.status === "Discarded").length;
   const pct = rows.length ? (delivered / rows.length) * 100 : 0;
@@ -78,6 +81,7 @@ export function BatchPage({
             <p className="text-xs text-muted-foreground">
               {colKeys.length} collections · {rows.length} dresses · {delivered} delivered
             </p>
+            {releaseDate ? <p className="mt-1 text-xs text-muted-foreground">Delivery date: {releaseDate}</p> : null}
             <div className="mt-2 max-w-[360px]">
               <div className="flex rounded-full overflow-hidden bg-muted" style={{ height: 8 }}>
                 {["Delivered", "In Progress", "Needs Revision", "Discarded"].map((s) => {
@@ -102,6 +106,11 @@ export function BatchPage({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {canEdit ? (
+              <button type="button" onClick={() => { setEditingBatch((value) => !value); setFormError(""); }} className="rounded-xl border border-border bg-secondary px-3 py-2 text-xs font-bold flex items-center gap-1.5">
+                <Pencil className="size-3.5" /> Edit batch
+              </button>
+            ) : null}
             <BulkStatusControl disabled={!canEdit} onPick={(status) => onBulkStatus("release", rel, status, rows.length)} />
             <CostInput
               scope="release"
@@ -153,6 +162,39 @@ export function BatchPage({
         </div>
       </div>
 
+      {canEdit && editingBatch ? (
+        <form className="rounded-[14px] border border-border bg-card p-4 mb-4 flex flex-wrap items-end gap-3" onSubmit={async (event) => {
+          event.preventDefault(); setSaving(true); setFormError("");
+          try { await onEditBatch(rel, batchName.trim(), batchDate); setEditingBatch(false); }
+          catch (error) { setFormError(error.message); }
+          finally { setSaving(false); }
+        }}>
+          <label className="text-xs font-semibold flex flex-col gap-1">Batch name<input value={batchName} onChange={(event) => setBatchName(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" required /></label>
+          <label className="text-xs font-semibold flex flex-col gap-1">Delivery date<input type="date" value={batchDate} onChange={(event) => setBatchDate(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" /></label>
+          <Button size="sm" disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button>
+          {formError ? <p className="basis-full text-xs text-destructive">{formError}</p> : null}
+        </form>
+      ) : null}
+
+      {canEdit ? (
+        <div className="mb-4">
+          <button type="button" onClick={() => { setAddingCollection((value) => !value); setFormError(""); }} className="text-xs font-bold text-primary flex items-center gap-1"><Plus className="size-4" /> Add collection</button>
+          {addingCollection ? (
+            <form className="mt-3 rounded-[14px] border border-border bg-card p-4 flex flex-wrap items-end gap-3" onSubmit={async (event) => {
+              event.preventDefault(); setSaving(true); setFormError("");
+              try { await onAddCollection(rel, collectionName.trim(), Number(dressCount)); setAddingCollection(false); setCollectionName(""); }
+              catch (error) { setFormError(error.message); }
+              finally { setSaving(false); }
+            }}>
+              <label className="text-xs font-semibold flex flex-col gap-1">Collection name<input value={collectionName} onChange={(event) => setCollectionName(event.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm" required /></label>
+              <label className="text-xs font-semibold flex flex-col gap-1">Dresses<input type="number" min="1" max="60" value={dressCount} onChange={(event) => setDressCount(event.target.value)} className="w-20 rounded-lg border border-border bg-background px-3 py-2 text-sm" required /></label>
+              <Button size="sm" disabled={saving}>{saving ? "Creating…" : "Create collection"}</Button>
+              {formError ? <p className="basis-full text-xs text-destructive">{formError}</p> : null}
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+
       {openFiles ? (
         <DressFiles
           // Same reason as BatchPage's key: DressFiles keeps the opened
@@ -185,6 +227,9 @@ export function BatchPage({
             onRetry={onRetry}
             onBulkStatus={onBulkStatus}
             onRenameCollection={onRenameCollection}
+            onDeleteCollection={onDeleteCollection}
+            canDelete={colKeys.length > 1}
+            onRenameDress={onRenameDress}
             onOpenFiles={setOpenFiles}
           />
         );
